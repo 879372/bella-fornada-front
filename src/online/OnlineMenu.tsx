@@ -7,7 +7,6 @@ import {
   Clock3,
   Copy,
   CreditCard,
-  MapPin,
   Minus,
   Plus,
   QrCode,

@@ -1,0 +1,493 @@
+/* Delivery: fila de pedidos, bairros e configuração do cardápio online */
+
+.delivery-page svg { width: 18px; height: 18px; flex-shrink: 0; }
+.delivery-page .spin { animation: spin .8s linear infinite; }
+
+.delivery-page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* Abas */
+.delivery-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+.delivery-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.delivery-tabs button:hover { color: var(--text-primary); }
+.delivery-tabs button.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Indicadores */
+.delivery-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.delivery-kpis > div {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 18px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.delivery-kpis span { font-size: 0.78rem; color: var(--text-muted); font-weight: 600; }
+.delivery-kpis strong { font-size: 1.6rem; color: var(--text-primary); }
+.delivery-kpis svg { position: absolute; top: 16px; right: 16px; color: var(--accent); }
+
+/* Barra de busca e filtros */
+.delivery-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.delivery-search {
+  flex: 1 1 240px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+}
+
+.delivery-search input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 0;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  outline: none;
+}
+
+.delivery-toolbar select {
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+/* Impressão automática */
+.delivery-auto-print {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-card);
+  cursor: pointer;
+}
+
+.delivery-auto-print input { position: absolute; opacity: 0; pointer-events: none; }
+.delivery-auto-print strong { display: flex; align-items: center; gap: 6px; font-size: 0.875rem; color: var(--text-primary); }
+.delivery-auto-print small { display: block; font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
+.delivery-auto-print:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.delivery-switch {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--border);
+  transition: background .15s ease;
+}
+
+.delivery-switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform .15s ease;
+}
+
+.delivery-auto-print.on .delivery-switch { background: var(--accent-green); }
+.delivery-auto-print.on .delivery-switch::after { transform: translateX(16px); }
+
+/* Mensagens */
+.delivery-alert {
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  font-size: 0.875rem;
+}
+
+.delivery-alert.error { background: rgba(200, 63, 63, .1); color: var(--accent-red); }
+
+.delivery-empty {
+  grid-column: 1 / -1;
+  padding: 40px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+/* Quadro de pedidos */
+.delivery-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.delivery-order-card {
+  --status-color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  text-align: left;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--status-color);
+  border-radius: 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+
+.delivery-order-card:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(87, 57, 20, .08); }
+.delivery-order-card header { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--text-muted); font-weight: 600; }
+.delivery-order-card h2 { font-size: 1rem; font-weight: 700; }
+.delivery-order-card p { font-size: 0.8rem; color: var(--text-secondary); }
+.delivery-order-card footer { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
+.delivery-order-card footer svg { color: var(--text-muted); }
+
+/* Cores por status (cards e etiqueta) */
+.status-recebido { --status-color: var(--accent-yellow); }
+.status-aguardando_pagamento { --status-color: #b8860b; }
+.status-confirmado { --status-color: #2f6fb2; }
+.status-em_preparo { --status-color: var(--accent); }
+.status-pronto { --status-color: #7a4fb0; }
+.status-saiu_entrega { --status-color: #1b8aa0; }
+.status-concluido { --status-color: var(--accent-green); }
+.status-cancelado { --status-color: var(--accent-red); }
+
+.delivery-status-pill {
+  --status-color: var(--text-muted);
+  display: inline-block;
+  align-self: flex-start;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--status-color);
+  background: color-mix(in srgb, var(--status-color) 12%, transparent);
+}
+
+/* Painel lateral de detalhes */
+.delivery-detail-overlay,
+.delivery-form-overlay,
+.delivery-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(36, 27, 18, .45);
+}
+
+.delivery-detail-overlay { display: flex; justify-content: flex-end; }
+
+.delivery-detail {
+  display: flex;
+  flex-direction: column;
+  width: min(460px, 100%);
+  height: 100%;
+  background: var(--bg-primary);
+  box-shadow: -12px 0 32px rgba(36, 27, 18, .18);
+  animation: slide-up .2s ease;
+}
+
+.delivery-detail-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px 20px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+}
+
+.delivery-detail-head span { font-size: 0.78rem; color: var(--text-muted); font-weight: 600; }
+.delivery-detail-head h2 { font-size: 1.15rem; font-weight: 700; color: var(--text-primary); }
+.delivery-detail-head small { font-size: 0.78rem; color: var(--text-muted); }
+
+.delivery-detail-head button,
+.delivery-admin-form header button {
+  display: inline-flex;
+  padding: 6px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.delivery-detail-head button:hover,
+.delivery-admin-form header button:hover { background: var(--bg-hover); }
+
+.delivery-detail-scroll {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 20px;
+}
+
+.delivery-detail-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.delivery-detail-card h3 { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; font-weight: 700; color: var(--text-primary); }
+.delivery-detail-card a { color: var(--accent); font-weight: 600; text-decoration: none; }
+.delivery-detail-card a:hover { text-decoration: underline; }
+
+.delivery-detail-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--border);
+}
+
+.delivery-detail-item span { display: flex; flex-direction: column; gap: 2px; }
+.delivery-detail-item b { color: var(--text-primary); font-weight: 600; }
+.delivery-detail-item small { font-size: 0.75rem; color: var(--text-muted); }
+.delivery-detail-item strong { color: var(--text-primary); white-space: nowrap; }
+
+.delivery-detail-totals { display: flex; flex-direction: column; gap: 4px; padding-top: 4px; }
+.delivery-detail-totals span,
+.delivery-detail-totals strong { display: flex; justify-content: space-between; }
+.delivery-detail-totals strong { font-size: 1rem; color: var(--text-primary); }
+
+.delivery-payment-ok { display: inline-flex; align-items: center; gap: 6px; color: var(--accent-green); font-weight: 700; }
+
+.delivery-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px 20px;
+  background: var(--bg-card);
+  border-top: 1px solid var(--border);
+}
+
+/* Botões internos dos painéis (detalhe, confirmação e formulários) */
+.delivery-detail-actions button,
+.delivery-confirm footer button,
+.delivery-admin-form footer button,
+.delivery-payment-form > div button {
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.delivery-detail-actions button:hover,
+.delivery-confirm footer button:hover,
+.delivery-admin-form footer button:hover { background: var(--bg-hover); }
+
+.delivery-detail-actions button:not(.print):not(.danger),
+.delivery-confirm footer button.primary,
+.delivery-admin-form footer button.primary,
+.delivery-payment-form > div button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.delivery-detail-actions button.danger,
+.delivery-confirm footer button.danger { background: transparent; border-color: var(--accent-red); color: var(--accent-red); }
+
+.delivery-detail-actions button:disabled,
+.delivery-confirm footer button:disabled,
+.delivery-admin-form footer button:disabled { opacity: .55; cursor: not-allowed; }
+
+/* Confirmação de mudança de status */
+.delivery-confirm-overlay,
+.delivery-form-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 1010;
+}
+
+.delivery-confirm,
+.delivery-admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(420px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  padding: 20px;
+  background: var(--bg-card);
+  border-radius: 14px;
+  box-shadow: 0 20px 48px rgba(36, 27, 18, .25);
+}
+
+.delivery-confirm > span { font-size: 0.75rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); font-weight: 700; }
+.delivery-confirm h2 { font-size: 1.15rem; color: var(--text-primary); }
+.delivery-confirm p { font-size: 0.875rem; color: var(--text-secondary); }
+.delivery-confirm footer,
+.delivery-admin-form footer { display: flex; gap: 8px; }
+
+.delivery-payment-form { display: flex; flex-direction: column; gap: 10px; }
+.delivery-payment-form > div { display: flex; gap: 6px; }
+.delivery-payment-form small { color: var(--accent-red); font-size: 0.75rem; }
+
+/* Campos de formulário dentro dos painéis */
+.delivery-confirm label,
+.delivery-admin-form label,
+.delivery-config-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.delivery-confirm textarea,
+.delivery-confirm input,
+.delivery-admin-form input:not([type="checkbox"]),
+.delivery-config-grid input {
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: inherit;
+}
+
+.delivery-confirm textarea { min-height: 80px; resize: vertical; }
+
+.delivery-admin-form header { display: flex; justify-content: space-between; align-items: center; }
+.delivery-admin-form h2 { font-size: 1.1rem; color: var(--text-primary); }
+
+.delivery-check { flex-direction: row !important; align-items: center; gap: 8px !important; cursor: pointer; }
+
+/* Bairros e configuração */
+.delivery-admin-card > header,
+.delivery-config > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.delivery-admin-card h2,
+.delivery-config h2 { font-size: 1.05rem; color: var(--text-primary); }
+.delivery-admin-card header p,
+.delivery-config header p { font-size: 0.85rem; color: var(--text-muted); }
+
+.delivery-neighborhood-list { display: flex; flex-direction: column; }
+
+.delivery-neighborhood-list button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 4px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.delivery-neighborhood-list button:hover { background: var(--bg-hover); }
+.delivery-neighborhood-list span { flex: 1; display: flex; flex-direction: column; }
+.delivery-neighborhood-list small { font-size: 0.75rem; color: var(--text-muted); }
+.delivery-neighborhood-list svg { color: var(--text-muted); }
+
+.delivery-store-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  border-radius: 10px;
+  background: rgba(200, 63, 63, .08);
+  color: var(--accent-red);
+  font-weight: 700;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.delivery-store-toggle.open { background: rgba(22, 129, 95, .1); color: var(--accent-green); }
+
+.delivery-config-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+@media (max-width: 768px) {
+  .delivery-kpis { grid-template-columns: 1fr; }
+  .delivery-kpis > div { flex-direction: row; align-items: baseline; justify-content: space-between; padding-right: 48px; }
+  .delivery-config-grid { grid-template-columns: 1fr; }
+  .delivery-toolbar select,
+  .delivery-toolbar .btn { flex: 1 1 auto; }
+}

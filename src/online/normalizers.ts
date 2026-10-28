@@ -144,7 +144,7 @@ export function normalizeOrder(value: unknown): DeliveryOrder {
   const rawItems = list(first(source, ['items', 'itens']));
   const fulfillmentRaw = text(first(source, ['fulfillment', 'tipo_entrega', 'modalidade'])).toUpperCase();
   const fulfillment = fulfillmentRaw === 'DELIVERY' || fulfillmentRaw === 'ENTREGA' ? 'ENTREGA' : 'RETIRADA';
-  const token = text(first(source, ['tracking_token', 'public_token', 'token_publico', 'token', 'uuid']));
+  const token = text(first(source, ['rastreamento_token', 'tracking_token', 'public_token', 'token_publico', 'token', 'uuid']));
   return {
     id: text(first(source, ['id', 'numero', 'codigo'])),
     token,

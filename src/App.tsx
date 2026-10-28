@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { useAuthStore } from './store/authStore';
 import './index.css';
@@ -16,6 +16,11 @@ const Compras = lazy(() => import('./pages/Compras/Compras.tsx'));
 const Relatorios = lazy(() => import('./pages/Relatorios/Relatorios.tsx'));
 const Vendas = lazy(() => import('./pages/Vendas/Vendas.tsx'));
 const Estoque = lazy(() => import('./pages/Estoque/Estoque.tsx'));
+const Delivery = lazy(() => import('./pages/Delivery/Delivery.tsx'));
+const Producao = lazy(() => import('./pages/Producao/Producao.tsx'));
+const Usuarios = lazy(() => import('./pages/Usuarios/Usuarios.tsx'));
+const OnlineMenu = lazy(() => import('./online/OnlineMenu.tsx'));
+const OrderTracking = lazy(() => import('./online/OrderTracking.tsx'));
 
 interface PrivateRouteProps {
   children: React.ReactNode;
@@ -26,6 +31,11 @@ const PrivateRoute = ({ children }: PrivateRouteProps) => {
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
 };
 
+const OrderTrackingRoute = () => {
+  const { token = '' } = useParams();
+  return <OrderTracking token={token} />;
+};
+
 function App() {
   return (
     <BrowserRouter>
@@ -33,6 +43,10 @@ function App() {
       <Suspense fallback={<div className="loading" style={{ minHeight: '100vh' }}>Carregando sistema...</div>}>
        <Routes>
         <Route path="/login" element={<Login />} />
+
+        {/* Cardápio online e acompanhamento de pedido: públicos, sem login */}
+        <Route path="/cardapio" element={<OnlineMenu />} />
+        <Route path="/acompanhar/:token" element={<OrderTrackingRoute />} />
 
         <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
           <Route index element={<Navigate to="/dashboard" replace />} />
@@ -45,6 +59,9 @@ function App() {
           <Route path="compras" element={<Compras />} />
           <Route path="relatorios" element={<Relatorios />} />
           <Route path="vendas" element={<Vendas />} />
+          <Route path="delivery" element={<Delivery />} />
+          <Route path="producao" element={<Producao />} />
+          <Route path="usuarios" element={<Usuarios />} />
         </Route>
 
         <Route path="/pdv" element={<PrivateRoute><PDV /></PrivateRoute>} />

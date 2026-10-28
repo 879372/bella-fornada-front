@@ -188,7 +188,7 @@ export default function Producao() {
     },
   });
 
-  const orders = ordersQuery.data ?? [];
+  const orders = useMemo(() => ordersQuery.data ?? [], [ordersQuery.data]);
   const stats = useMemo(() => ({
     planned: orders.filter((item) => item.status === 'PLANEJADA').length,
     active: orders.filter((item) => item.status === 'EM_PRODUCAO').length,
@@ -264,7 +264,7 @@ export default function Producao() {
         <div className="card table-card">
           {lossesQuery.isLoading ? <div className="loading">Carregando perdas...</div> : !lossesQuery.data?.length ? <Empty icon={<AlertTriangle size={44} />} title="Nenhuma perda registrada" /> : (
             <div className="table-wrapper"><table className="table"><thead><tr><th>Data</th><th>Produto</th><th>Quantidade</th><th>Motivo</th><th>Observação</th></tr></thead><tbody>
-              {lossesQuery.data.map((loss) => <tr key={loss.id}><td>{new Date(loss.created_at).toLocaleString('pt-BR')}</td><td><strong>{loss.produto_nome}</strong></td><td>{loss.quantidade}</td><td>{loss.motivo.replaceAll('_', ' ')}</td><td>{loss.observacoes || '—'}</td></tr>)}
+              {lossesQuery.data.map((loss) => <tr key={loss.id}><td>{new Date(loss.created_at).toLocaleString('pt-BR')}</td><td><strong>{loss.produto_nome}</strong></td><td>{loss.quantidade}</td><td>{loss.motivo.replace(/_/g, ' ')}</td><td>{loss.observacoes || '—'}</td></tr>)}
             </tbody></table></div>
           )}
         </div>

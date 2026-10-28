@@ -14,8 +14,15 @@ import {
   Menu,
   X,
   History,
-  Boxes
+  Boxes,
+  Bike,
+  ChefHat,
+  ShieldCheck
 } from 'lucide-react';
+
+type Papel = 'ADMIN' | 'GERENTE' | 'CAIXA' | 'PRODUCAO' | 'ENTREGADOR';
+
+const GESTAO: Papel[] = ['ADMIN', 'GERENTE'];
 
 const navItems = [
   { label: 'Dashboard', Icon: LayoutDashboard, to: '/dashboard', section: 'PRINCIPAL' },
@@ -27,8 +34,11 @@ const navItems = [
   { label: 'Clientes', Icon: Users, to: '/clientes', section: null },
   { label: 'Compras / Entradas', Icon: FileInput, to: '/compras', section: 'OPERACIONAL' },
   { label: 'Financeiro', Icon: Wallet, to: '/financeiro', section: null },
+  { label: 'Delivery', Icon: Bike, to: '/delivery', section: null },
+  { label: 'Produção', Icon: ChefHat, to: '/producao', section: null },
   { label: 'Relatórios', Icon: BarChart3, to: '/relatorios', section: null },
-];
+  { label: 'Usuários', Icon: ShieldCheck, to: '/usuarios', section: 'ADMINISTRAÇÃO', roles: GESTAO },
+] as { label: string; Icon: typeof Package; to: string; section: string | null; external?: boolean; roles?: Papel[] }[];
 
 export default function Layout() {
   const { logout, user } = useAuthStore();
@@ -44,6 +54,9 @@ export default function Layout() {
   };
 
   const closeSidebar = () => setSidebarOpen(false);
+
+  // Sem papel (sessão antiga) mostra tudo; o backend continua validando as permissões.
+  const visibleItems = navItems.filter(item => !item.roles || !user?.papel || item.roles.includes(user.papel));
 
   return (
     <div className="layout">
@@ -67,12 +80,12 @@ export default function Layout() {
         </div>
 
         <nav className="sidebar-nav">
-          {navItems.map((item, index) => {
+          {visibleItems.map((item, index) => {
             // Verifica se este item inicia uma nova seção
             // Busca a última seção definida em itens anteriores
             let lastSection = '';
             for (let i = 0; i < index; i++) {
-              const section = navItems[i].section;
+              const section = visibleItems[i].section;
               if (section) lastSection = section;
             }
 
@@ -117,7 +130,7 @@ export default function Layout() {
               <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {user?.username || 'Usuário'}
               </div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Operador</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{user?.papel_label || 'Operador'}</div>
             </div>
           </div>
 
