@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { useAuthStore } from './store/authStore';
+import PageLoader from './components/PageLoader';
 import './index.css';
 
 const Login = lazy(() => import('./pages/Login/Login'));
@@ -41,7 +42,7 @@ function App() {
   return (
     <BrowserRouter>
       <Toaster position="top-right" richColors closeButton />
-      <Suspense fallback={<div className="loading" style={{ minHeight: '100vh' }}>Carregando sistema...</div>}>
+      <Suspense fallback={<PageLoader label="Abrindo módulo..." />}>
        <Routes>
         <Route path="/login" element={<Login />} />
 

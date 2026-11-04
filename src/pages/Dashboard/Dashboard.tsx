@@ -146,8 +146,8 @@ export default function Dashboard() {
             <CalendarDays size={18} className="text-accent" style={{ color: 'var(--accent)' }} />
             <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Movimento do Mês</h3>
           </div>
-          <div style={{ flex: 1, minHeight: 0, minWidth: 0 }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div style={{ flex: 1, minHeight: 0, minWidth: 0 }} aria-busy={isLoading}>
+            {isLoading ? <DashboardChartSkeleton /> : <ResponsiveContainer width="100%" height="100%">
               <BarChart data={stats?.grafico_vendas}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
                 <XAxis
@@ -179,7 +179,7 @@ export default function Dashboard() {
                   ))}
                 </Bar>
               </BarChart>
-            </ResponsiveContainer>
+            </ResponsiveContainer>}
           </div>
         </div>
 
@@ -190,7 +190,7 @@ export default function Dashboard() {
             <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Alertas de Ruptura</h3>
           </div>
           <div style={{ flex: 1, overflowY: 'auto' }}>
-            {stats?.produtos_ruptura?.length === 0 ? (
+            {isLoading ? <DashboardAlertsSkeleton /> : stats?.produtos_ruptura?.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
                 Nenhum problema de estoque detectado.
               </div>
@@ -214,3 +214,6 @@ export default function Dashboard() {
     </div>
   );
 }
+
+function DashboardChartSkeleton() { return <div className="dashboard-loading-chart" aria-hidden="true">{[1, 2, 3, 4, 5, 6, 7].map(item => <span className="skeleton-shimmer" key={item} />)}</div>; }
+function DashboardAlertsSkeleton() { return <div className="dashboard-loading-alerts" aria-hidden="true">{[1, 2, 3].map(item => <div key={item}><span className="skeleton-shimmer" /><span className="skeleton-shimmer" /></div>)}</div>; }

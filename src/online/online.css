@@ -25,6 +25,8 @@
     #f8f1ed;
 }
 
+.bf-skeleton { display: block; border-radius: 10px; background: linear-gradient(90deg, #eee1da 20%, #f8f0ec 48%, #eee1da 76%); background-size: 220% 100%; animation: bf-skeleton-shimmer 1.35s ease-in-out infinite; }.bf-menu-skeleton .bf-online-hero { min-height: 260px; }.bf-skeleton-brand { width: 210px; height: 46px; }.bf-skeleton-status { width: 130px; height: 30px; }.bf-skeleton-stack { display: grid; gap: 13px; width: min(580px, 100%); }.bf-skeleton-stack span:nth-child(1) { width: 28%; height: 14px; }.bf-skeleton-stack span:nth-child(2) { width: 82%; height: 52px; }.bf-skeleton-stack span:nth-child(3) { width: 68%; height: 20px; }.bf-skeleton-title { margin-bottom: 18px; }.bf-skeleton-title span:nth-child(1) { width: 100px; height: 12px; }.bf-skeleton-title span:nth-child(2) { width: 230px; height: 32px; }.bf-skeleton-product { min-height: 265px; padding: 14px; border: 1px solid var(--bf-line); border-radius: 18px; background: var(--bf-paper); }.bf-skeleton-product > span { height: 126px; margin-bottom: 16px; }.bf-skeleton-product .bf-skeleton-stack { gap: 10px; }.bf-skeleton-product .bf-skeleton-stack span:nth-child(1) { width: 70%; height: 20px; }.bf-skeleton-product .bf-skeleton-stack span:nth-child(2) { width: 92%; height: 14px; }.bf-skeleton-product .bf-skeleton-stack span:nth-child(3) { width: 38%; height: 22px; }@keyframes bf-skeleton-shimmer { to { background-position: -220% 0; } }
+
 .bf-online button,
 .bf-public-overlay button,
 .bf-order-success button,

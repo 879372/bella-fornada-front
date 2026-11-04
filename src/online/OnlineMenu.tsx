@@ -159,7 +159,7 @@ export default function OnlineMenu({ companySlug = COMPANY_SLUG }: { companySlug
       .filter(line => line.quantity > 0));
   };
 
-  if (loading && !menu) return <PublicState message="Abrindo o cardapio da Bella Fornada..." />;
+  if (loading && !menu) return <OnlineMenuSkeleton />;
   if (!menu) return <PublicState message={error || 'Cardapio indisponivel no momento.'} error />;
   if (result) {
     return <OrderSuccess order={result} menu={menu} onNewOrder={() => {
@@ -655,4 +655,8 @@ function PublicState({ message, error = false }: { message: string; error?: bool
       <p>{message}</p>
     </main>
   );
+}
+
+function OnlineMenuSkeleton() {
+  return <main className="bf-online bf-menu-skeleton" aria-busy="true" aria-live="polite"><span className="sr-only">Abrindo o cardápio da Bella Fornada...</span><header className="bf-online-header" aria-hidden="true"><span className="bf-skeleton bf-skeleton-brand" /><span className="bf-skeleton bf-skeleton-status" /></header><section className="bf-online-hero" aria-hidden="true"><div className="bf-skeleton-stack"><span className="bf-skeleton" /><span className="bf-skeleton" /><span className="bf-skeleton" /></div></section><section className="bf-menu-content" aria-hidden="true"><div className="bf-skeleton-stack bf-skeleton-title"><span className="bf-skeleton" /><span className="bf-skeleton" /></div><div className="bf-product-grid">{[1, 2, 3, 4, 5, 6].map(item => <div className="bf-skeleton-product" key={item}><span className="bf-skeleton" /><div className="bf-skeleton-stack"><span className="bf-skeleton" /><span className="bf-skeleton" /><span className="bf-skeleton" /></div></div>)}</div></section></main>;
 }

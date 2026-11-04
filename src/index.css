@@ -636,6 +636,15 @@ button, input, select, textarea {
   color: var(--text-muted);
 }
 
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.skeleton-shimmer { display: block; border-radius: 10px; background: linear-gradient(90deg, var(--bg-card) 20%, rgba(143, 96, 75, .12) 48%, var(--bg-card) 76%); background-size: 220% 100%; animation: skeleton-shimmer 1.35s ease-in-out infinite; }
+.page-loader { width: min(1180px, calc(100% - 40px)); min-height: 100vh; margin: 0 auto; padding: 34px 0; }
+.page-loader-heading { display: grid; gap: 10px; width: min(380px, 75%); margin-bottom: 28px; }
+.page-loader-heading span:first-child { height: 28px; }.page-loader-heading span:last-child { height: 16px; width: 68%; }.page-loader-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 22px; }.page-loader-card { height: 128px; }.page-loader-content { height: min(48vh, 430px); }
+.dashboard-loading-chart { height: 100%; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); align-items: end; gap: 14px; padding: 24px 12px 8px; border-bottom: 1px solid var(--border); }.dashboard-loading-chart span:nth-child(1) { height: 36%; }.dashboard-loading-chart span:nth-child(2) { height: 58%; }.dashboard-loading-chart span:nth-child(3) { height: 46%; }.dashboard-loading-chart span:nth-child(4) { height: 72%; }.dashboard-loading-chart span:nth-child(5) { height: 52%; }.dashboard-loading-chart span:nth-child(6) { height: 84%; }.dashboard-loading-chart span:nth-child(7) { height: 64%; }.dashboard-loading-alerts { display: grid; gap: 18px; padding-top: 4px; }.dashboard-loading-alerts > div { display: grid; gap: 8px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }.dashboard-loading-alerts span:first-child { height: 16px; width: 64%; }.dashboard-loading-alerts span:last-child { height: 12px; width: 40%; }
+@keyframes skeleton-shimmer { to { background-position: -220% 0; } }
+@media (max-width: 720px) { .page-loader { width: min(100% - 28px, 1180px); padding-top: 20px; }.page-loader-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }.page-loader-card { height: 108px; } }
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
