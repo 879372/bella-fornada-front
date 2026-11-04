@@ -205,25 +205,25 @@ export default function Producao() {
   const busy = saveRecipe.isPending || saveOrder.isPending || saveLoss.isPending;
 
   return (
-    <div className="animate-in">
+    <div className="animate-in production-page">
       <div className="page-header page-header-row">
         <div>
           <h1 className="page-title">Produção e fornadas</h1>
           <p className="page-subtitle">Fichas técnicas, planejamento, lotes, validade e perdas</p>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div className="page-actions">
           <button className="btn btn-ghost" onClick={() => setModal('perda')}><Trash2 size={17} /> Registrar perda</button>
           <button className="btn btn-primary" onClick={() => setModal(tab === 'receitas' ? 'receita' : 'ordem')}><Plus size={17} /> {tab === 'receitas' ? 'Nova ficha técnica' : 'Planejar fornada'}</button>
         </div>
       </div>
 
-      <div className="kpi-grid compact-kpis">
-        <div className="kpi-card yellow"><div className="kpi-label">Planejadas</div><div className="kpi-value">{stats.planned}</div></div>
-        <div className="kpi-card blue"><div className="kpi-label">Em produção</div><div className="kpi-value">{stats.active}</div></div>
-        <div className="kpi-card green"><div className="kpi-label">Concluídas</div><div className="kpi-value">{stats.done}</div></div>
+      <div className="production-kpis">
+        <div className="kpi-card yellow"><div className="kpi-label">Planejadas</div><div className="kpi-value">{stats.planned}</div><small>Aguardando início</small></div>
+        <div className="kpi-card blue"><div className="kpi-label">Em produção</div><div className="kpi-value">{stats.active}</div><small>Em andamento agora</small></div>
+        <div className="kpi-card green"><div className="kpi-label">Concluídas</div><div className="kpi-value">{stats.done}</div><small>Fornadas finalizadas</small></div>
       </div>
 
-      <div className="tab-group" style={{ marginBottom: 16 }}>
+      <div className="production-tabs" role="tablist" aria-label="Seções de produção">
         <button className={tab === 'ordens' ? 'active' : ''} onClick={() => setTab('ordens')}><ClipboardList size={16} /> Ordens</button>
         <button className={tab === 'receitas' ? 'active' : ''} onClick={() => setTab('receitas')}><Wheat size={16} /> Fichas técnicas</button>
         <button className={tab === 'perdas' ? 'active' : ''} onClick={() => setTab('perdas')}><AlertTriangle size={16} /> Perdas</button>
@@ -231,7 +231,7 @@ export default function Producao() {
 
       {tab === 'ordens' && (
         <div className="card table-card">
-          {ordersQuery.isLoading ? <div className="loading">Carregando ordens...</div> : orders.length === 0 ? <Empty icon={<Flame size={44} />} title="Nenhuma fornada planejada" /> : (
+          {ordersQuery.isLoading ? <div className="loading">Carregando ordens...</div> : orders.length === 0 ? <Empty icon={<Flame size={44} />} title="Nenhuma fornada planejada" description="Planeje a próxima produção para acompanhar lote, validade e consumo." action="Planejar fornada" onAction={() => setModal('ordem')} /> : (
             <div className="table-wrapper"><table className="table"><thead><tr><th>Produto</th><th>Planejamento</th><th>Lote / validade</th><th>Quantidade</th><th>Status</th><th>Ações</th></tr></thead><tbody>
               {orders.map((order) => <tr key={order.id}>
                 <td><strong>{order.produto_nome}</strong><div className="mono-muted">{order.receita_nome}</div></td>
@@ -252,7 +252,7 @@ export default function Producao() {
 
       {tab === 'receitas' && (
         <div className="card table-card">
-          {recipesQuery.isLoading ? <div className="loading">Carregando fichas...</div> : !recipesQuery.data?.length ? <Empty icon={<Wheat size={44} />} title="Nenhuma ficha técnica" /> : (
+          {recipesQuery.isLoading ? <div className="loading">Carregando fichas...</div> : !recipesQuery.data?.length ? <Empty icon={<Wheat size={44} />} title="Nenhuma ficha técnica" description="Cadastre os ingredientes e o rendimento para planejar suas fornadas." action="Criar ficha técnica" onAction={() => setModal('receita')} /> : (
             <div className="table-wrapper"><table className="table"><thead><tr><th>Ficha</th><th>Produto final</th><th>Rendimento</th><th>Tempo</th><th>Ingredientes</th></tr></thead><tbody>
               {recipesQuery.data.map((recipe) => <tr key={recipe.id}><td><strong>{recipe.nome}</strong></td><td>{recipe.produto_nome}</td><td>{recipe.rendimento} {recipe.unidade_rendimento}</td><td>{recipe.tempo_preparo_minutos} min</td><td>{recipe.ingredientes.map((item) => `${item.ingrediente_nome} (${item.quantidade} ${item.unidade || ''})`).join(', ')}</td></tr>)}
             </tbody></table></div>
@@ -262,7 +262,7 @@ export default function Producao() {
 
       {tab === 'perdas' && (
         <div className="card table-card">
-          {lossesQuery.isLoading ? <div className="loading">Carregando perdas...</div> : !lossesQuery.data?.length ? <Empty icon={<AlertTriangle size={44} />} title="Nenhuma perda registrada" /> : (
+          {lossesQuery.isLoading ? <div className="loading">Carregando perdas...</div> : !lossesQuery.data?.length ? <Empty icon={<AlertTriangle size={44} />} title="Nenhuma perda registrada" description="Quando houver uma baixa por sobra, avaria ou vencimento, ela aparecerá aqui." action="Registrar perda" onAction={() => setModal('perda')} /> : (
             <div className="table-wrapper"><table className="table"><thead><tr><th>Data</th><th>Produto</th><th>Quantidade</th><th>Motivo</th><th>Observação</th></tr></thead><tbody>
               {lossesQuery.data.map((loss) => <tr key={loss.id}><td>{new Date(loss.created_at).toLocaleString('pt-BR')}</td><td><strong>{loss.produto_nome}</strong></td><td>{loss.quantidade}</td><td>{loss.motivo.replace(/_/g, ' ')}</td><td>{loss.observacoes || '—'}</td></tr>)}
             </tbody></table></div>
@@ -308,7 +308,7 @@ function RecipeFields({ form, setForm, products }: { form: typeof emptyRecipe; s
   </div>;
 }
 
-function Empty({ icon, title }: { icon: ReactNode; title: string }) {
-  return <div className="empty-state">{icon}<h3>{title}</h3><p>Use o botão acima para começar.</p></div>;
+function Empty({ icon, title, description, action, onAction }: { icon: ReactNode; title: string; description: string; action: string; onAction: () => void }) {
+  return <div className="empty-state production-empty">{icon}<h3>{title}</h3><p>{description}</p><button className="btn btn-primary" onClick={onAction}><Plus size={17} /> {action}</button></div>;
 }
 

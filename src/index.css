@@ -1580,6 +1580,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .badge svg, .inline-icon svg { vertical-align: middle; margin-right: 4px; }
 .truncate-cell { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .empty-state { min-height: 300px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 10px; padding: 40px; color: var(--text-muted); text-align: center; }
+.production-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 260px)); gap: 16px; margin-bottom: 24px; }
+.production-kpis .kpi-card { min-height: 156px; padding: 22px; }
+.production-kpis .kpi-card small { display: block; margin-top: 10px; color: var(--text-muted); font-size: .78rem; }
+.production-tabs { display: inline-flex; gap: 4px; padding: 5px; margin-bottom: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card); box-shadow: 0 4px 14px rgba(87, 57, 20, .05); }
+.production-tabs button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 40px; padding: 8px 14px; border: 0; border-radius: 8px; background: transparent; color: var(--text-secondary); font: inherit; font-size: .86rem; font-weight: 700; cursor: pointer; }
+.production-tabs button:hover { background: var(--bg-hover); color: var(--text-primary); }
+.production-tabs button.active { background: var(--accent); color: white; box-shadow: 0 4px 10px rgba(99, 57, 45, .22); }
+.production-empty { min-height: 280px; padding: 36px 24px; }.production-empty svg { color: var(--accent); }.production-empty h3 { color: var(--text-primary); }.production-empty p { max-width: 480px; margin-bottom: 10px; }
 .filter-card { margin-bottom: 20px; }
 .filters-grid { display: grid; grid-template-columns: minmax(240px, 2fr) 1fr 1fr auto; align-items: end; gap: 14px; }
 .compact-kpis { grid-template-columns: repeat(2, minmax(220px, 320px)); }
@@ -1609,6 +1617,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 @media (max-width: 768px) {
+  .production-kpis { grid-template-columns: 1fr; gap: 10px; margin-bottom: 18px; }
+  .production-kpis .kpi-card { min-height: 118px; }
+  .production-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+  .production-tabs button { min-width: 0; padding: 8px 6px; font-size: .74rem; }
+  .production-tabs button svg { width: 15px; }
   .page-header-row { align-items: stretch; }
   .page-actions { width: 100%; flex-direction: column; }
   .page-actions .btn { width: 100%; }
