@@ -517,6 +517,16 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .table-empty-row strong { margin-bottom: 6px; color: var(--text-primary); font-size: .95rem; }
 .table-empty-row span { font-size: .82rem; }
 .table-filter-empty { min-height: 240px; }
+.cash-sales-detail { margin-top: 24px; padding: 0; overflow: hidden; }
+.cash-sales-detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 22px 24px; border-bottom: 1px solid var(--border); }
+.cash-sales-detail-header span { color: var(--accent); font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.cash-sales-detail-header h2 { margin: 4px 0; font-size: 1.18rem; }
+.cash-sales-detail-header p { margin: 0; color: var(--text-muted); font-size: .84rem; }
+.cash-sales-summary { display: flex; gap: 28px; padding: 16px 24px; background: var(--bg-primary); border-bottom: 1px solid var(--border); }
+.cash-sales-summary div { display: grid; gap: 2px; }
+.cash-sales-summary span { color: var(--text-muted); font-size: .76rem; }
+.cash-sales-summary strong { font-size: 1rem; color: var(--text-primary); }
+.table-payment-badges { display: flex; flex-wrap: wrap; gap: 5px; }
 
 .table td {
   padding: 12px 14px;

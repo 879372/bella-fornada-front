@@ -12,7 +12,9 @@ import {
   Wallet,
   Clock,
   User as UserIcon,
-  FileText
+  FileText,
+  ReceiptText,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { NavLink } from 'react-router-dom';
@@ -50,6 +52,7 @@ interface Sessao {
 export default function Relatorios() {
   const [tab, setTab] = useState<'vendas' | 'caixa'>('vendas');
   const [vendaParaCancelar, setVendaParaCancelar] = useState<Venda | null>(null);
+  const [sessaoSelecionada, setSessaoSelecionada] = useState<Sessao | null>(null);
   const queryClient = useQueryClient();
 
   const now = new Date();
@@ -94,6 +97,15 @@ export default function Relatorios() {
       return resp.data.results || resp.data;
     },
     enabled: tab === 'caixa'
+  });
+
+  const { data: vendasDoCaixa = [], isLoading: loadingVendasDoCaixa } = useQuery<Venda[]>({
+    queryKey: ['relatorios-vendas-caixa', sessaoSelecionada?.id],
+    queryFn: async () => {
+      const resp = await api.get('/vendas/', { params: { sessao: sessaoSelecionada?.id } });
+      return resp.data.results || resp.data;
+    },
+    enabled: Boolean(sessaoSelecionada),
   });
 
   const formasMap: Record<string, number> = {};
@@ -349,7 +361,7 @@ export default function Relatorios() {
           {loadingSessoes ? <div className="loading">Carregando sessões...</div> : sessoes.length === 0 ? (
             <div className="m-empty">Nenhuma sessão encontrada.</div>
           ) : sessoesLista.visiveis.map((s) => (
-            <div key={s.id} className="m-card">
+            <div key={s.id} className="m-card clickable" onClick={() => setSessaoSelecionada(s)}>
               <div className="m-card-head">
                 <div>
                   <div className="m-card-title"><UserIcon size={14} style={{ color: 'var(--accent)', verticalAlign: -2 }} /> {s.operador_nome}</div>
@@ -368,6 +380,7 @@ export default function Relatorios() {
                 <span className="m-card-sub">Saldo final (est.)</span>
                 <span className="m-card-value" style={{ color: 'var(--accent-green)' }}>R$ {parseFloat(s.saldo_final_calculado).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
               </div>
+              <div className="m-card-actions"><button className="btn btn-ghost btn-sm" onClick={(event) => { event.stopPropagation(); setSessaoSelecionada(s); }}><ReceiptText size={15} /> Ver vendas</button></div>
             </div>
           ))}
           <InfiniteScroll hasMore={sessoesLista.temMais} onLoadMore={sessoesLista.carregarMais} />
@@ -384,16 +397,16 @@ export default function Relatorios() {
                   <th>Fim</th>
                   <th>Vendas</th>
                   <th>Sangrias</th>
-                  <th style={{ textAlign: 'right' }}>Final (Est.)</th>
+                  <th style={{ textAlign: 'right' }}>Final (Est.)</th><th className="table-actions-cell">Detalhes</th>
                 </tr>
               </thead>
               <tbody>
                 {loadingSessoes ? (
                   [1, 2, 3].map(i => (
-                    <tr key={i}><td colSpan={7}><div className="skeleton-line" style={{ height: 24, margin: '8px 0' }}></div></td></tr>
+                    <tr key={i}><td colSpan={8}><div className="skeleton-line" style={{ height: 24, margin: '8px 0' }}></div></td></tr>
                   ))
                 ) : sessoes.length === 0 ? (
-                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>Nenhuma sessão encontrada.</td></tr>
+                  <tr className="table-empty-row"><td colSpan={8}><strong>Nenhum caixa encontrado.</strong><span>Ajuste o período selecionado para consultar outras sessões.</span></td></tr>
                 ) : sessoes.map(s => (
                   <tr key={s.id}>
                     <td>
@@ -414,6 +427,7 @@ export default function Relatorios() {
                     <td style={{ textAlign: 'right', fontWeight: 800, color: 'var(--accent-green)' }}>
                       R$ {parseFloat(s.saldo_final_calculado).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
+                    <td className="table-actions-cell"><button className="btn btn-ghost btn-sm" onClick={() => setSessaoSelecionada(s)}><ReceiptText size={15} /> Vendas</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -421,6 +435,12 @@ export default function Relatorios() {
           </div>
         </div>
       )}
+
+      {tab === 'caixa' && sessaoSelecionada && <section className="card cash-sales-detail" aria-live="polite">
+        <header className="cash-sales-detail-header"><div><span>Caixa #{sessaoSelecionada.id}</span><h2>{sessaoSelecionada.operador_nome}</h2><p>{new Date(sessaoSelecionada.aberta_em).toLocaleString('pt-BR')}{sessaoSelecionada.fechada_em ? ` — ${new Date(sessaoSelecionada.fechada_em).toLocaleString('pt-BR')}` : ' — Em aberto'}</p></div><button className="btn btn-ghost btn-icon" onClick={() => setSessaoSelecionada(null)} aria-label="Fechar vendas do caixa"><X size={18} /></button></header>
+        <div className="cash-sales-summary"><div><span>Vendas no caixa</span><strong>{vendasDoCaixa.length}</strong></div><div><span>Total vendido</span><strong>R$ {vendasDoCaixa.reduce((total, venda) => total + Number(venda.total || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></div></div>
+        {loadingVendasDoCaixa ? <div className="loading">Carregando vendas do caixa...</div> : vendasDoCaixa.length === 0 ? <div className="empty-state table-filter-empty"><ReceiptText size={40} /><h3>Nenhuma venda neste caixa</h3><p>As vendas finalizadas nesta sessão aparecerão aqui.</p></div> : <div className="table-wrapper"><table className="table"><thead><tr><th>Venda</th><th>Data/Hora</th><th>Pagamentos</th><th>Status</th><th style={{ textAlign: 'right' }}>Total</th></tr></thead><tbody>{vendasDoCaixa.map(venda => <tr key={venda.id}><td><strong>#{venda.id}</strong></td><td>{new Date(venda.created_at).toLocaleString('pt-BR')}</td><td><div className="table-payment-badges">{venda.pagamentos?.length ? venda.pagamentos.map((pagamento, index) => <span className="badge badge-blue" key={`${venda.id}-${index}`}>{pagamento.forma} · R$ {Number(pagamento.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>) : '—'}</div></td><td><span className="badge badge-green">{venda.status.replace('_', ' ')}</span></td><td style={{ textAlign: 'right' }}><strong className="text-success">R$ {Number(venda.total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></td></tr>)}</tbody></table></div>}
+      </section>}
 
       <ConfirmModal
         isOpen={!!vendaParaCancelar}
