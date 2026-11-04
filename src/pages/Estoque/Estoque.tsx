@@ -1,6 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Boxes, History, Pencil, Search, X } from 'lucide-react';
+import { AlertTriangle, Boxes, History, LoaderCircle, Pencil, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '../../lib/api';
 import KardexModal from '../Produtos/KardexModal';
@@ -174,13 +174,13 @@ export default function Estoque() {
       </div>
 
       {produto && (
-        <Modal onClose={() => setProduto(null)} labelledBy="stock-adjustment-title" panelClassName="modal-content modal-panel-sm">
+        <Modal onClose={() => setProduto(null)} labelledBy="stock-adjustment-title" panelClassName="modal-content modal-panel-sm" isBusy={ajusteMutation.isPending}>
             <div className="modal-header">
               <div>
                 <h2 id="stock-adjustment-title" className="modal-title">Ajustar estoque</h2>
                 <p className="modal-subtitle">{produto.nome}</p>
               </div>
-              <button className="btn-icon" onClick={() => setProduto(null)} aria-label="Fechar"><X size={20} /></button>
+              <button className="btn-icon" onClick={() => setProduto(null)} aria-label="Fechar" disabled={ajusteMutation.isPending}><X size={20} /></button>
             </div>
             <form onSubmit={salvarAjuste}>
               <div className="form-group">
@@ -189,8 +189,8 @@ export default function Estoque() {
                 <p className="field-hint">O histórico registrará automaticamente a diferença como ajuste manual.</p>
               </div>
               <div className="modal-footer">
-                <button type="button" className="btn btn-ghost" onClick={() => setProduto(null)}>Cancelar</button>
-                <button type="submit" className="btn btn-primary" disabled={ajusteMutation.isPending}>Salvar ajuste</button>
+                <button type="button" className="btn btn-ghost" onClick={() => setProduto(null)} disabled={ajusteMutation.isPending}>Cancelar</button>
+                <button type="submit" className="btn btn-primary" disabled={ajusteMutation.isPending} aria-busy={ajusteMutation.isPending}>{ajusteMutation.isPending ? <><LoaderCircle className="button-spinner" size={16} aria-hidden="true" /> Salvando...</> : 'Salvar ajuste'}</button>
               </div>
             </form>
         </Modal>

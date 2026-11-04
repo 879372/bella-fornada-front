@@ -1,22 +1,27 @@
 import { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { LoaderCircle } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
 export default function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { login } = useAuthStore();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setError('');
+    setIsSubmitting(true);
     try {
       await login(username, password);
       navigate('/dashboard');
     } catch {
       setError('Não foi possível entrar. Confira o usuário e a senha e tente novamente.');
+    } finally { setIsSubmitting(false);
     }
   };
 
@@ -50,6 +55,7 @@ export default function Login() {
               autoComplete="username"
               aria-invalid={Boolean(error)}
               aria-describedby={error ? 'login-error' : undefined}
+              disabled={isSubmitting}
             />
           </div>
           <div className="form-group" style={{ marginBottom: 24 }}>
@@ -65,6 +71,7 @@ export default function Login() {
               autoComplete="current-password"
               aria-invalid={Boolean(error)}
               aria-describedby={error ? 'login-error' : undefined}
+              disabled={isSubmitting}
             />
           </div>
 
@@ -74,8 +81,9 @@ export default function Login() {
             className="btn btn-primary"
             type="submit"
             style={{ width: '100%', justifyContent: 'center', padding: '14px', fontSize: '1rem' }}
+            disabled={isSubmitting} aria-busy={isSubmitting}
           >
-            Entrar no Sistema
+            {isSubmitting ? <><LoaderCircle className="button-spinner" size={18} aria-hidden="true" /> Entrando...</> : 'Entrar no Sistema'}
           </button>
         </form>
 

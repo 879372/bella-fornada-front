@@ -1,4 +1,4 @@
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, LoaderCircle } from 'lucide-react';
 import Modal from './Modal';
 
 interface ConfirmModalProps {
@@ -36,6 +36,7 @@ export default function ConfirmModal({
       describedBy={descriptionId}
       overlayClassName="modal-overlay-top"
       panelClassName="card animate-in modal-panel modal-panel-sm modal-text-center"
+      isBusy={isLoading}
     >
         <div style={{
           padding: 16,
@@ -65,7 +66,7 @@ export default function ConfirmModal({
             onClick={onConfirm}
             disabled={isLoading}
           >
-            {isLoading ? 'Aguarde...' : confirmLabel}
+            {isLoading ? <><LoaderCircle className="button-spinner" size={16} aria-hidden="true" /> Processando...</> : confirmLabel}
           </button>
         </div>
       <style>{`

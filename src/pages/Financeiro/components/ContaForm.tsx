@@ -1,6 +1,7 @@
 import { useState, FormEvent } from 'react';
 import api from '../../../lib/api';
 import { toast } from 'sonner';
+import { LoaderCircle } from 'lucide-react';
 
 interface ContaFormProps {
   tipo: 'PAGAR' | 'RECEBER';
@@ -20,11 +21,14 @@ export default function ContaForm({ tipo, editData, onSave, onClose }: ContaForm
     recorrente: editData?.recorrente || false,
     data_fim_recorrencia: editData?.data_fim_recorrencia || '',
   });
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleChange = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
+    setIsSaving(true);
     const payload = {
       descricao: form.descricao,
       valor: parseFloat(form.valor),
@@ -49,7 +53,7 @@ export default function ContaForm({ tipo, editData, onSave, onClose }: ContaForm
     } catch (err) {
       console.error('Erro ao salvar conta:', err);
       toast.error('Erro ao salvar lançamento.');
-    }
+    } finally { setIsSaving(false); }
   };
 
   return (
@@ -148,11 +152,11 @@ export default function ContaForm({ tipo, editData, onSave, onClose }: ContaForm
       </div>
 
       <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
-        <button type="button" className="btn btn-ghost" style={{ flex: 1, justifyContent: 'center' }} onClick={onClose}>
+        <button type="button" className="btn btn-ghost" style={{ flex: 1, justifyContent: 'center' }} onClick={onClose} disabled={isSaving}>
           Cancelar
         </button>
-        <button type="submit" className="btn btn-primary" style={{ flex: 2, justifyContent: 'center' }}>
-          {editData ? 'Salvar Alterações' : 'Confirmar Lançamento'}
+        <button type="submit" className="btn btn-primary" style={{ flex: 2, justifyContent: 'center' }} disabled={isSaving} aria-busy={isSaving}>
+          {isSaving ? <><LoaderCircle className="button-spinner" size={16} aria-hidden="true" /> Salvando...</> : editData ? 'Salvar Alterações' : 'Confirmar Lançamento'}
         </button>
       </div>
     </form>

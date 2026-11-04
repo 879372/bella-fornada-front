@@ -10,6 +10,7 @@ interface ModalProps {
   panelStyle?: CSSProperties;
   overlayStyle?: CSSProperties;
   closeOnBackdrop?: boolean;
+  isBusy?: boolean;
 }
 
 const FOCUSABLE_SELECTOR = [
@@ -31,6 +32,7 @@ export default function Modal({
   panelStyle,
   overlayStyle,
   closeOnBackdrop = true,
+  isBusy = false,
 }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
@@ -58,7 +60,7 @@ export default function Modal({
   }, []);
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Escape') {
+    if (event.key === 'Escape' && !isBusy) {
       event.preventDefault();
       closeRef.current();
       return;
@@ -92,7 +94,7 @@ export default function Modal({
       className={`modal-overlay${overlayClassName ? ` ${overlayClassName}` : ''}`}
       style={overlayStyle}
       onMouseDown={(event) => {
-        if (closeOnBackdrop && event.target === event.currentTarget) closeRef.current();
+        if (!isBusy && closeOnBackdrop && event.target === event.currentTarget) closeRef.current();
       }}
     >
       <div
@@ -103,6 +105,7 @@ export default function Modal({
         aria-modal="true"
         aria-labelledby={labelledBy}
         aria-describedby={describedBy}
+        aria-busy={isBusy}
         tabIndex={-1}
         onKeyDown={handleKeyDown}
       >

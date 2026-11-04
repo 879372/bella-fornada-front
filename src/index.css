@@ -40,6 +40,8 @@ body {
 button, input, select, textarea {
   color-scheme: light;
 }
+button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid rgba(99, 57, 45, .32); outline-offset: 2px; }
 
 /* ========================
    LAYOUT
@@ -312,7 +314,9 @@ button, input, select, textarea {
   white-space: nowrap;
   min-height: 40px;
   justify-content: center;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis;
 }
+.btn:disabled { pointer-events: none; }.button-spinner { animation: button-spin .8s linear infinite; flex: 0 0 auto; }@keyframes button-spin { to { transform: rotate(360deg); } }
 
 .btn-primary {
   background: var(--accent);
@@ -1331,7 +1335,9 @@ button, input, select, textarea {
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  overscroll-behavior: contain;
 }
+.modal-content :is(h1, h2, h3, p, span, label, small) { overflow-wrap: anywhere; }
 
 .modal-panel {
   width: min(94vw, 680px) !important;
@@ -1374,6 +1380,7 @@ button, input, select, textarea {
   padding-top: 20px;
   border-top: 1px solid var(--border);
 }
+.modal-actions .btn, .modal-footer .btn { min-width: 0; }
 
 .pdv-payment-grid {
   display: flex;
@@ -1613,6 +1620,7 @@ button, input, select, textarea {
   .segmented-control button { flex: 1; justify-content: center; }
   .modal-footer { position: sticky; bottom: -24px; margin-left: -24px; margin-right: -24px; padding: 14px 24px; background: var(--bg-card); }
   .modal-footer .btn { min-width: 0; flex: 1; white-space: normal; }
+  .modal-actions { flex-direction: column-reverse; }.modal-actions .btn { width: 100%; }
   .pdv-payment-modal { padding: 20px !important; }
 }
 

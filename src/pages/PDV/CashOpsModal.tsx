@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../lib/api';
-import { X, ArrowDownCircle, ArrowUpCircle, Check } from 'lucide-react';
+import { X, ArrowDownCircle, ArrowUpCircle, Check, LoaderCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import Modal from '../../components/Modal';
 
@@ -48,6 +48,7 @@ export default function CashOpsModal({ sessaoId, tipo, onClose }: CashOpsModalPr
       describedBy="cash-operation-description"
       overlayClassName="modal-overlay-raised"
       panelClassName="modal-content modal-panel-sm"
+      isBusy={mutation.isPending}
     >
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -56,7 +57,7 @@ export default function CashOpsModal({ sessaoId, tipo, onClose }: CashOpsModalPr
             </div>
             <h2 id="cash-operation-title" className="modal-title">{tipo === 'SANGRIA' ? 'Sangria de Caixa' : 'Suprimento de Caixa'}</h2>
           </div>
-          <button className="btn-icon" onClick={onClose} aria-label="Fechar modal"><X size={20} /></button>
+          <button className="btn-icon" onClick={onClose} aria-label="Fechar modal" disabled={mutation.isPending}><X size={20} /></button>
         </div>
 
         <form onSubmit={handleSubmit} className="modal-body">
@@ -77,6 +78,7 @@ export default function CashOpsModal({ sessaoId, tipo, onClose }: CashOpsModalPr
               required
               value={valor}
               onChange={e => setValor(e.target.value)}
+              disabled={mutation.isPending}
               placeholder="0,00"
               style={{ fontSize: '1.5rem', fontWeight: 700, textAlign: 'center', height: 50 }}
             />
@@ -89,13 +91,14 @@ export default function CashOpsModal({ sessaoId, tipo, onClose }: CashOpsModalPr
               className="input"
               value={motivo}
               onChange={e => setMotivo(e.target.value)}
+              disabled={mutation.isPending}
               placeholder="Descreva o motivo..."
             />
           </div>
         </form>
 
         <div className="modal-footer">
-          <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button type="button" className="btn btn-ghost" onClick={onClose} disabled={mutation.isPending}>Cancelar</button>
           <button
             type="submit"
             className={`btn ${tipo === 'SANGRIA' ? 'btn-danger' : 'btn-primary'}`}
@@ -103,7 +106,7 @@ export default function CashOpsModal({ sessaoId, tipo, onClose }: CashOpsModalPr
             disabled={mutation.isPending}
             style={{ minWidth: 120 }}
           >
-            {mutation.isPending ? 'Processando...' : (
+            {mutation.isPending ? <><LoaderCircle className="button-spinner" size={16} aria-hidden="true" /> Processando...</> : (
               <>
                 <Check size={18} />
                 Confirmar
