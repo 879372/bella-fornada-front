@@ -2,22 +2,22 @@
 
 :root {
   color-scheme: light;
-  --bg-primary: #f7f4ed;
-  --bg-secondary: #fffdf8;
+  --bg-primary: #f7f1ed;
+  --bg-secondary: #fffdfb;
   --bg-card: #ffffff;
-  --bg-hover: #f3ead9;
-  --border: #e5d9c5;
-  --accent: #8f5b12;
-  --accent-hover: #86520c;
+  --bg-hover: #f0e4dc;
+  --border: #e2d2c8;
+  --accent: #63392d;
+  --accent-hover: #4c2a21;
   --accent-green: #16815f;
   --accent-red: #c83f3f;
-  --accent-yellow: #c47b13;
-  --text-primary: #241b12;
-  --text-secondary: #635548;
-  --text-muted: #746354;
+  --accent-yellow: #9a5d3f;
+  --text-primary: #2e1b16;
+  --text-secondary: #67514a;
+  --text-muted: #806961;
   --card-bg: #ffffff;
-  --bg-body: #f7f4ed;
-  --primary: #8f5b12;
+  --bg-body: #f7f1ed;
+  --primary: #63392d;
   --sidebar-width: 240px;
 }
 

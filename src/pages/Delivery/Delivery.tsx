@@ -178,7 +178,7 @@ function OrderQueue() {
       <label className={`delivery-auto-print ${autoPrint ? 'on' : ''}`}>
         <input type="checkbox" checked={autoPrint} onChange={event => { setAutoPrintEnabled(event.target.checked); setAutoPrint(event.target.checked); }} />
         <span className="delivery-switch" />
-        <span><strong><Printer /> Imprimir pedidos novos automaticamente</strong><small>Ative apenas no computador conectado a impressora do caixa.</small></span>
+        <span><strong><Printer /> Enviar pedidos novos para a impressora da cozinha</strong><small>Deixe esta tela aberta no computador da cozinha. Cada pedido novo do cardápio será impresso automaticamente.</small></span>
       </label>
 
       {error && <div className="delivery-alert error">{error}</div>}
