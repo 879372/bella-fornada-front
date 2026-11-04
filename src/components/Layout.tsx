@@ -17,7 +17,8 @@ import {
   Boxes,
   Bike,
   ChefHat,
-  ShieldCheck
+  ShieldCheck,
+  ReceiptText
 } from 'lucide-react';
 
 type Papel = 'ADMIN' | 'GERENTE' | 'CAIXA' | 'PRODUCAO' | 'ENTREGADOR';
@@ -36,6 +37,7 @@ const navItems = [
   { label: 'Financeiro', Icon: Wallet, to: '/financeiro', section: null },
   { label: 'Delivery', Icon: Bike, to: '/delivery', section: null },
   { label: 'Produção', Icon: ChefHat, to: '/producao', section: null },
+  { label: 'Notas fiscais', Icon: ReceiptText, to: '/fiscal', section: null },
   { label: 'Relatórios', Icon: BarChart3, to: '/relatorios', section: null },
   { label: 'Usuários', Icon: ShieldCheck, to: '/usuarios', section: 'ADMINISTRAÇÃO', roles: GESTAO },
 ] as { label: string; Icon: typeof Package; to: string; section: string | null; external?: boolean; roles?: Papel[] }[];
