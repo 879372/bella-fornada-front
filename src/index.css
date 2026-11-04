@@ -512,6 +512,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   white-space: nowrap;
 }
 
+.table-empty-row td { padding: 46px 24px !important; text-align: center; color: var(--text-muted); }
+.table-empty-row strong, .table-empty-row span { display: block; }
+.table-empty-row strong { margin-bottom: 6px; color: var(--text-primary); font-size: .95rem; }
+.table-empty-row span { font-size: .82rem; }
+.table-filter-empty { min-height: 240px; }
+
 .table td {
   padding: 12px 14px;
   border-bottom: 1px solid rgba(87, 57, 20, 0.08);

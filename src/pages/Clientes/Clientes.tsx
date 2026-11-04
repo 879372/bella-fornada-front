@@ -159,6 +159,8 @@ export default function Clientes() {
                     <td colSpan={6}><div className="skeleton-line" style={{ height: 24, margin: '8px 0', borderRadius: 4 }}></div></td>
                   </tr>
                 ))
+              ) : clientes.length === 0 ? (
+                <tr className="table-empty-row"><td colSpan={5}><strong>Nenhum cliente encontrado.</strong><span>{search ? 'Tente outro nome, CPF/CNPJ ou código.' : 'Cadastre o primeiro cliente para iniciar sua base.'}</span></td></tr>
               ) : (
                 clientes.map((c) => (
                   <tr key={c.id}>

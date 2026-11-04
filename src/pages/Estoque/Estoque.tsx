@@ -134,7 +134,9 @@ export default function Estoque() {
             <tbody>
               {isLoading ? [1, 2, 3, 4, 5].map((item) => (
                 <tr key={item}><td colSpan={6}><div className="skeleton-line" style={{ height: 24 }} /></td></tr>
-              )) : items.map((item) => {
+              )) : items.length === 0 ? (
+                <tr className="table-empty-row"><td colSpan={6}><strong>Nenhum item de estoque encontrado.</strong><span>{search ? 'Tente outro produto ou código.' : 'Cadastre produtos para acompanhar os saldos aqui.'}</span></td></tr>
+              ) : items.map((item) => {
                 const saldo = Number(item.estoque_atual || 0);
                 const baixo = saldo <= 10;
                 return (

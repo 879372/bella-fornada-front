@@ -154,7 +154,7 @@ export default function Financeiro() {
       </div>
 
       <div className="card table-card list-card">
-        {loading ? <div className="loading">Carregando financeiro...</div> : list.length === 0 ? <div className="empty-state"><Wallet size={44} /><h3>Nenhum lançamento no período</h3></div> : isMobile ? (
+        {loading ? <div className="loading">Carregando financeiro...</div> : list.length === 0 ? <div className="empty-state"><Wallet size={44} /><h3>Nenhum lançamento no período</h3><p>Registre uma despesa ou um recebível para começar.</p></div> : visiveis.length === 0 ? <div className="empty-state table-filter-empty"><Wallet size={44} /><h3>Nenhum lançamento encontrado</h3><p>Altere a busca ou o mês selecionado.</p></div> : isMobile ? (
           <div className="m-list">
             {visiveis.map((item) => (
               <div key={`${item.tipo}-${item.id}`} className="m-card">

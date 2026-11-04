@@ -128,6 +128,8 @@ export default function Compras() {
       <div className="card table-card list-card">
         {isLoading ? <div className="loading">Carregando registros...</div> : compras.length === 0 ? (
           <div className="empty-state"><FileText size={44} /><h3>Nenhuma compra encontrada</h3><p>Registre uma compra para manter o histórico organizado.</p></div>
+        ) : visiveis.length === 0 ? (
+          <div className="empty-state table-filter-empty"><FileText size={44} /><h3>Nenhuma compra encontrada</h3><p>Altere os filtros ou registre uma nova compra.</p></div>
         ) : isMobile ? (
           <div className="m-list">
             {visiveis.map((compra) => (
