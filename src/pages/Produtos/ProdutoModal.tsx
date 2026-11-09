@@ -19,6 +19,7 @@ interface Produto {
   unidade_medida: string;
   grupo: string;
   subgrupo: string;
+  marca: string;
   ativo: boolean;
   descricao_delivery: string;
   disponivel_delivery: boolean;
@@ -28,7 +29,13 @@ interface Produto {
   cest: string;
   cfop: string;
   cst_icms: string;
+  cst_pis: string;
+  cst_cofins: string;
   origem_mercadoria: string;
+  codigo_beneficio_fiscal: string;
+  unidade_tributavel: string;
+  gtin_tributavel: string;
+  fator_conversao_tributavel: number | string;
   aliquota_icms: number | string;
   aliquota_pis: number | string;
   aliquota_cofins: number | string;
@@ -53,6 +60,7 @@ export default function ProdutoModal({ produto, onClose, onSuccess }: ProdutoMod
     unidade_medida: 'UN',
     grupo: '',
     subgrupo: '',
+    marca: '',
     ativo: true,
     descricao_delivery: '',
     disponivel_delivery: false,
@@ -62,7 +70,13 @@ export default function ProdutoModal({ produto, onClose, onSuccess }: ProdutoMod
     cest: '',
     cfop: '5102',
     cst_icms: '102',
+    cst_pis: '',
+    cst_cofins: '',
     origem_mercadoria: '0',
+    codigo_beneficio_fiscal: '',
+    unidade_tributavel: 'UN',
+    gtin_tributavel: '',
+    fator_conversao_tributavel: 1,
     aliquota_icms: 0,
     aliquota_pis: 0,
     aliquota_cofins: 0,
@@ -110,6 +124,13 @@ export default function ProdutoModal({ produto, onClose, onSuccess }: ProdutoMod
         codigo_barras: produto.codigo_barras || '',
         preco_compra: produto.preco_compra ?? '',
         preco_venda: produto.preco_venda ?? '',
+        marca: produto.marca || '',
+        cst_pis: produto.cst_pis || '',
+        cst_cofins: produto.cst_cofins || '',
+        codigo_beneficio_fiscal: produto.codigo_beneficio_fiscal || '',
+        unidade_tributavel: produto.unidade_tributavel || produto.unidade_medida || 'UN',
+        gtin_tributavel: produto.gtin_tributavel || produto.codigo_barras || '',
+        fator_conversao_tributavel: produto.fator_conversao_tributavel || 1,
         estoque_inicial: produto.estoque_atual ?? 0,
       });
       setMargem(margemInicial);
@@ -163,6 +184,7 @@ export default function ProdutoModal({ produto, onClose, onSuccess }: ProdutoMod
         aliquota_icms: Number(formData.aliquota_icms || 0),
         aliquota_pis: Number(formData.aliquota_pis || 0),
         aliquota_cofins: Number(formData.aliquota_cofins || 0),
+        fator_conversao_tributavel: Number(formData.fator_conversao_tributavel || 1),
       };
 
       // Se for novo ou o código legado estiver vazio, removemos para o backend gerar
@@ -291,6 +313,11 @@ export default function ProdutoModal({ produto, onClose, onSuccess }: ProdutoMod
             </div>
 
             <div style={{ gridColumn: 'span 6' }}>
+              <label className="form-label" htmlFor="produto-marca">Marca</label>
+              <input id="produto-marca" name="marca" value={formData.marca} onChange={handleChange} className="input" />
+            </div>
+
+            <div style={{ gridColumn: 'span 6' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                 <label className="form-label" htmlFor={showAddGrupo ? 'produto-novo-grupo' : 'produto-grupo'} style={{ marginBottom: 0 }}>Grupo / Categoria</label>
                 <button
@@ -371,7 +398,13 @@ export default function ProdutoModal({ produto, onClose, onSuccess }: ProdutoMod
                   <div style={{ gridColumn: 'span 3' }}><label className="form-label">CEST</label><input className="input" name="cest" maxLength={7} inputMode="numeric" value={formData.cest} onChange={handleChange} /></div>
                   <div style={{ gridColumn: 'span 3' }}><label className="form-label">CFOP</label><input className="input" name="cfop" maxLength={4} inputMode="numeric" value={formData.cfop} onChange={handleChange} /></div>
                   <div style={{ gridColumn: 'span 3' }}><label className="form-label">CST / CSOSN</label><input className="input" name="cst_icms" maxLength={3} value={formData.cst_icms} onChange={handleChange} /></div>
+                  <div style={{ gridColumn: 'span 3' }}><label className="form-label">CST PIS</label><input className="input" name="cst_pis" maxLength={2} inputMode="numeric" value={formData.cst_pis} onChange={handleChange} /></div>
+                  <div style={{ gridColumn: 'span 3' }}><label className="form-label">CST COFINS</label><input className="input" name="cst_cofins" maxLength={2} inputMode="numeric" value={formData.cst_cofins} onChange={handleChange} /></div>
                   <div style={{ gridColumn: 'span 3' }}><label className="form-label">Origem</label><select className="input" name="origem_mercadoria" value={formData.origem_mercadoria} onChange={handleChange}><option value="0">0 — Nacional</option><option value="1">1 — Importação direta</option><option value="2">2 — Mercado interno/importado</option></select></div>
+                  <div style={{ gridColumn: 'span 3' }}><label className="form-label">Código benefício fiscal</label><input className="input" name="codigo_beneficio_fiscal" maxLength={10} value={formData.codigo_beneficio_fiscal} onChange={handleChange} /></div>
+                  <div style={{ gridColumn: 'span 3' }}><label className="form-label">Unidade tributável</label><input className="input" name="unidade_tributavel" maxLength={6} value={formData.unidade_tributavel} onChange={handleChange} /></div>
+                  <div style={{ gridColumn: 'span 3' }}><label className="form-label">GTIN tributável</label><input className="input" name="gtin_tributavel" maxLength={14} inputMode="numeric" value={formData.gtin_tributavel} onChange={handleChange} /></div>
+                  <div style={{ gridColumn: 'span 3' }}><label className="form-label">Conversão tributável</label><input className="input" name="fator_conversao_tributavel" type="number" step="0.000001" min="0.000001" value={formData.fator_conversao_tributavel} onChange={handleChange} /></div>
                   <div style={{ gridColumn: 'span 3' }}><label className="form-label">ICMS (%)</label><input className="input" name="aliquota_icms" type="number" step="0.01" min="0" value={formData.aliquota_icms} onChange={handleChange} /></div>
                   <div style={{ gridColumn: 'span 3' }}><label className="form-label">PIS (%)</label><input className="input" name="aliquota_pis" type="number" step="0.01" min="0" value={formData.aliquota_pis} onChange={handleChange} /></div>
                   <div style={{ gridColumn: 'span 3' }}><label className="form-label">COFINS (%)</label><input className="input" name="aliquota_cofins" type="number" step="0.01" min="0" value={formData.aliquota_cofins} onChange={handleChange} /></div>

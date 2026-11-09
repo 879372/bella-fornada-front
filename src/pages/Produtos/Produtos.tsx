@@ -26,6 +26,7 @@ interface Produto {
   unidade_medida: string;
   grupo: string;
   subgrupo: string;
+  marca: string;
   ativo: boolean;
   descricao_delivery: string;
   disponivel_delivery: boolean;
@@ -35,7 +36,13 @@ interface Produto {
   cest: string;
   cfop: string;
   cst_icms: string;
+  cst_pis: string;
+  cst_cofins: string;
   origem_mercadoria: string;
+  codigo_beneficio_fiscal: string;
+  unidade_tributavel: string;
+  gtin_tributavel: string;
+  fator_conversao_tributavel: string | number;
   aliquota_icms: string | number;
   aliquota_pis: string | number;
   aliquota_cofins: string | number;

@@ -187,7 +187,7 @@ export default function Estoque() {
             <form onSubmit={salvarAjuste}>
               <div className="form-group">
                 <label className="form-label">Novo saldo ({produto.unidade_medida})</label>
-                <input className="input input-emphasis" type="number" min="0" step="0.001" autoFocus value={novoSaldo} onChange={(event) => setNovoSaldo(event.target.value)} />
+                <input className="input input-emphasis" type="number" min="0" step="0.001" autoFocus value={novoSaldo} onChange={(event) => setNovoSaldo(event.target.value)} disabled={ajusteMutation.isPending} />
                 <p className="field-hint">O histórico registrará automaticamente a diferença como ajuste manual.</p>
               </div>
               <div className="modal-footer">
