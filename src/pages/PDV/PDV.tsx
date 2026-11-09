@@ -85,6 +85,15 @@ export const parseEntradaPdv = (raw: string) => {
   return { termo, quantidade, ehCodigo: /^\d+$/.test(termo) };
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
+export const quantidadeRetornadaPeloCodigo = (
+  produto: Produto,
+  quantidadeDigitada: number,
+) => {
+  const quantidadeBalanca = Number(produto.quantidade_balanca);
+  return quantidadeBalanca > 0 ? quantidadeBalanca : quantidadeDigitada;
+};
+
 import { toast } from 'sonner';
 
 export default function PDV() {
@@ -501,7 +510,10 @@ export default function PDV() {
       try {
         const { data } = await api.get<Produto[]>('/produtos/por-codigo/', { params: { codigo } });
         if (data.length === 1) {
-          await adicionarProduto(data[0], quantidade);
+          await adicionarProduto(
+            data[0],
+            quantidadeRetornadaPeloCodigo(data[0], quantidade),
+          );
         } else if (data.length === 0) {
           toast.error(`Produto não encontrado: ${codigo}`);
         } else {

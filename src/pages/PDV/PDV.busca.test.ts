@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseEntradaPdv } from './PDV';
+import { parseEntradaPdv, quantidadeRetornadaPeloCodigo } from './PDV';
 
 describe('parseEntradaPdv', () => {
   it('trata somente dígitos como código de barras', () => {
@@ -18,5 +18,24 @@ describe('parseEntradaPdv', () => {
 
   it('ignora quantidade zero ou inválida', () => {
     expect(parseEntradaPdv('0*789')).toEqual({ termo: '0*789', quantidade: 1, ehCodigo: false });
+  });
+});
+
+describe('quantidadeRetornadaPeloCodigo', () => {
+  it('usa o peso informado pela etiqueta da balança', () => {
+    expect(quantidadeRetornadaPeloCodigo({
+      id: '149',
+      nome: 'Pão de queijo mineiro',
+      preco_venda: '39.99',
+      quantidade_balanca: '0.084',
+    }, 1)).toBe(0.084);
+  });
+
+  it('mantém a quantidade digitada para código de barras comum', () => {
+    expect(quantidadeRetornadaPeloCodigo({
+      id: '1',
+      nome: 'Produto comum',
+      preco_venda: '10.00',
+    }, 3)).toBe(3);
   });
 });

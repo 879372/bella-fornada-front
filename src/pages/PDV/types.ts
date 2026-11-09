@@ -4,6 +4,7 @@ export interface Produto {
   preco_venda: string | number;
   codigo_legado?: string;
   unidade_medida?: string;
+  quantidade_balanca?: string | number;
 }
 
 export interface ItemCarrinho {
