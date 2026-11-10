@@ -21,6 +21,7 @@ const Delivery = lazy(() => import('./pages/Delivery/Delivery.tsx'));
 const Producao = lazy(() => import('./pages/Producao/Producao.tsx'));
 const Usuarios = lazy(() => import('./pages/Usuarios/Usuarios.tsx'));
 const Fiscal = lazy(() => import('./pages/Fiscal/Fiscal.tsx'));
+const ConfiguracaoFiscal = lazy(() => import('./pages/Fiscal/ConfiguracaoFiscal.tsx'));
 const Balancas = lazy(() => import('./pages/Balancas/Balancas.tsx'));
 const OnlineMenu = lazy(() => import('./online/OnlineMenu.tsx'));
 const OrderTracking = lazy(() => import('./online/OrderTracking.tsx'));
@@ -66,6 +67,7 @@ function App() {
           <Route path="producao" element={<Producao />} />
           <Route path="usuarios" element={<Usuarios />} />
           <Route path="fiscal" element={<Fiscal />} />
+          <Route path="fiscal/configuracao" element={<ConfiguracaoFiscal />} />
           <Route path="balancas" element={<Balancas />} />
         </Route>
 

@@ -39,6 +39,7 @@ const navItems = [
   { label: 'Delivery', Icon: Bike, to: '/delivery', section: null },
   { label: 'Produção', Icon: ChefHat, to: '/producao', section: null },
   { label: 'Notas fiscais', Icon: ReceiptText, to: '/fiscal', section: null },
+  { label: 'Configuração fiscal', Icon: ShieldCheck, to: '/fiscal/configuracao', section: null, roles: GESTAO },
   { label: 'Balanças', Icon: Scale, to: '/balancas', section: null, roles: GESTAO },
   { label: 'Relatórios', Icon: BarChart3, to: '/relatorios', section: null },
   { label: 'Usuários', Icon: ShieldCheck, to: '/usuarios', section: 'ADMINISTRAÇÃO', roles: GESTAO },
