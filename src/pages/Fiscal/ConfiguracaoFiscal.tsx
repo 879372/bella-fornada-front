@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { Save, ShieldCheck } from 'lucide-react';
+import { Save, ShieldCheck, BadgeCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '../../lib/api';
 
@@ -31,6 +31,7 @@ export default function ConfiguracaoFiscal() {
   const [certificado, setCertificado] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [validating, setValidating] = useState(false);
 
   useEffect(() => {
     api.get<Config>('/fiscal/configuracao/').then(({ data }) => setForm({ ...initial, ...data }))
@@ -57,6 +58,15 @@ export default function ConfiguracaoFiscal() {
       toast.success('Configuração fiscal salva com segurança.');
     } catch { toast.error('Confira os campos fiscais e tente novamente.'); }
     finally { setSaving(false); }
+  };
+
+  const validate = async () => {
+    setValidating(true);
+    try {
+      const { data } = await api.post<{ valido: boolean; valido_ate: string }>('/fiscal/configuracao/validar/');
+      toast.success(`Configuração válida. Certificado até ${new Date(data.valido_ate).toLocaleDateString('pt-BR')}.`);
+    } catch { toast.error('A configuração ou o certificado A1 ainda não estão válidos.'); }
+    finally { setValidating(false); }
   };
 
   if (loading) return <div className="page-container">Carregando configuração fiscal...</div>;
@@ -87,7 +97,7 @@ export default function ConfiguracaoFiscal() {
         {field('Série NFC-e','serie_nfce')}{field('Próximo número NFC-e','proximo_numero_nfce',{type:'number',min:1})}{field('Série NF-e','serie_nfe')}{field('Próximo número NF-e','proximo_numero_nfe',{type:'number',min:1})}
         {field('ID do CSC','csc_id')}<div><label className="form-label">CSC</label><input className="input" type="password" placeholder={form.csc_configurado?'Já configurado — deixe vazio para manter':'Token CSC'} value={csc} onChange={e=>setCsc(e.target.value)}/></div>
       </div>
-      <div className="modal-actions" style={{marginTop:24}}><button className="btn btn-primary" disabled={saving}><Save size={16}/>{saving?'Salvando...':'Salvar configuração fiscal'}</button></div>
+      <div className="modal-actions" style={{marginTop:24}}><button type="button" className="btn btn-ghost" disabled={validating} onClick={validate}><BadgeCheck size={16}/>{validating?'Validando...':'Validar configuração'}</button><button className="btn btn-primary" disabled={saving}><Save size={16}/>{saving?'Salvando...':'Salvar configuração fiscal'}</button></div>
     </form>
   </div>;
 }

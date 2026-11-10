@@ -30,9 +30,11 @@ interface Cliente {
   cep: string;
   endereco: string;
   numero: string;
+  complemento: string;
   bairro: string;
   cidade: string;
   uf: string;
+  codigo_municipio: string;
   ativo: boolean;
   codigo_legado?: string;
 }

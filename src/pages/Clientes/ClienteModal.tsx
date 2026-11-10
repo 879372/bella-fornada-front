@@ -14,9 +14,11 @@ interface Cliente {
   cep: string;
   endereco: string;
   numero: string;
+  complemento: string;
   bairro: string;
   cidade: string;
   uf: string;
+  codigo_municipio: string;
   ativo: boolean;
 }
 
@@ -37,9 +39,11 @@ export default function ClienteModal({ cliente, onClose, onSuccess }: ClienteMod
     cep: '',
     endereco: '',
     numero: '',
+    complemento: '',
     bairro: '',
     cidade: '',
     uf: '',
+    codigo_municipio: '',
     ativo: true
   });
 
@@ -56,9 +60,11 @@ export default function ClienteModal({ cliente, onClose, onSuccess }: ClienteMod
         cep: cliente.cep || '',
         endereco: cliente.endereco || '',
         numero: cliente.numero || '',
+        complemento: cliente.complemento || '',
         bairro: cliente.bairro || '',
         cidade: cliente.cidade || '',
-        uf: cliente.uf || ''
+        uf: cliente.uf || '',
+        codigo_municipio: cliente.codigo_municipio || ''
       });
     }
   }, [cliente]);
@@ -173,6 +179,11 @@ export default function ClienteModal({ cliente, onClose, onSuccess }: ClienteMod
               <input id="cliente-cep" name="cep" value={formData.cep} onChange={handleChange} className="input" placeholder="00000-000" />
             </div>
 
+            <div style={{ gridColumn: 'span 5' }}>
+              <label className="form-label" htmlFor="cliente-complemento">Complemento</label>
+              <input id="cliente-complemento" name="complemento" value={formData.complemento} onChange={handleChange} className="input" />
+            </div>
+
             <div style={{ gridColumn: 'span 9' }}>
               <label className="form-label" htmlFor="cliente-endereco">Logradouro / Endereço</label>
               <input id="cliente-endereco" name="endereco" value={formData.endereco} onChange={handleChange} className="input" placeholder="Rua, Av, Travessa..." />
@@ -196,6 +207,11 @@ export default function ClienteModal({ cliente, onClose, onSuccess }: ClienteMod
             <div style={{ gridColumn: 'span 2' }}>
               <label className="form-label" htmlFor="cliente-uf">UF</label>
               <input id="cliente-uf" name="uf" value={formData.uf} onChange={handleChange} className="input" maxLength={2} style={{ textTransform: 'uppercase' }} />
+            </div>
+
+            <div style={{ gridColumn: 'span 3' }}>
+              <label className="form-label" htmlFor="cliente-codigo-municipio">Código IBGE</label>
+              <input id="cliente-codigo-municipio" name="codigo_municipio" value={formData.codigo_municipio} onChange={handleChange} className="input" inputMode="numeric" maxLength={7} />
             </div>
 
           </div>
