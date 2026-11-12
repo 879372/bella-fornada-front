@@ -46,6 +46,11 @@ interface Produto {
   aliquota_icms: string | number;
   aliquota_pis: string | number;
   aliquota_cofins: string | number;
+  tipo_origem_comercial: string;
+  fiscal_confianca: string;
+  fiscal_fonte: string;
+  fiscal_observacao: string;
+  fiscal_revisado_em?: string | null;
 }
 
 export default function Produtos() {

@@ -1,5 +1,7 @@
 import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { AxiosError } from 'axios';
+import { toast } from 'sonner';
 import api from '../../lib/api';
 import { X, Package, DollarSign, Tag, Plus } from 'lucide-react';
 import Modal from '../../components/Modal';
@@ -39,6 +41,11 @@ interface Produto {
   aliquota_icms: number | string;
   aliquota_pis: number | string;
   aliquota_cofins: number | string;
+  tipo_origem_comercial: string;
+  fiscal_confianca: string;
+  fiscal_fonte: string;
+  fiscal_observacao: string;
+  fiscal_revisado_em?: string | null;
   estoque_inicial?: number | string;
   estoque_atual?: number | string;
 }
@@ -48,6 +55,21 @@ interface ProdutoModalProps {
   onClose: () => void;
   onSuccess: () => void;
 }
+
+const productErrorMessage = (error: unknown) => {
+  if (!(error instanceof AxiosError) || !error.response?.data) {
+    return 'Não foi possível salvar o produto.';
+  }
+  const data = error.response.data;
+  if (typeof data === 'string') return data;
+  if (typeof data !== 'object' || data === null) return 'Não foi possível salvar o produto.';
+
+  const messages = Object.entries(data as Record<string, unknown>).flatMap(([field, value]) => {
+    const values = Array.isArray(value) ? value : [value];
+    return values.map(message => `${field}: ${String(message)}`);
+  });
+  return messages.join(' ') || 'Não foi possível salvar o produto.';
+};
 
 export default function ProdutoModal({ produto, onClose, onSuccess }: ProdutoModalProps) {
   const queryClient = useQueryClient();
@@ -80,6 +102,10 @@ export default function ProdutoModal({ produto, onClose, onSuccess }: ProdutoMod
     aliquota_icms: 0,
     aliquota_pis: 0,
     aliquota_cofins: 0,
+    tipo_origem_comercial: 'NAO_CLASSIFICADO',
+    fiscal_confianca: 'NAO_REVISADO',
+    fiscal_fonte: '',
+    fiscal_observacao: '',
     estoque_inicial: 0
   });
 
@@ -129,8 +155,12 @@ export default function ProdutoModal({ produto, onClose, onSuccess }: ProdutoMod
         cst_cofins: produto.cst_cofins || '',
         codigo_beneficio_fiscal: produto.codigo_beneficio_fiscal || '',
         unidade_tributavel: produto.unidade_tributavel || produto.unidade_medida || 'UN',
-        gtin_tributavel: produto.gtin_tributavel || produto.codigo_barras || '',
+        gtin_tributavel: produto.gtin_tributavel || '',
         fator_conversao_tributavel: produto.fator_conversao_tributavel || 1,
+        tipo_origem_comercial: produto.tipo_origem_comercial || 'NAO_CLASSIFICADO',
+        fiscal_confianca: produto.fiscal_confianca || 'NAO_REVISADO',
+        fiscal_fonte: produto.fiscal_fonte || '',
+        fiscal_observacao: produto.fiscal_observacao || '',
         estoque_inicial: produto.estoque_atual ?? 0,
       });
       setMargem(margemInicial);
@@ -193,14 +223,22 @@ export default function ProdutoModal({ produto, onClose, onSuccess }: ProdutoMod
       }
 
       if (produto?.id) {
+        // Alterar dados cadastrais ou fiscais nunca deve reajustar o estoque.
+        // O saldo possui fluxo próprio de ajuste/Kardex.
+        delete (dataToSubmit as any).estoque_inicial;
+        delete (dataToSubmit as any).estoque_atual;
+        delete (dataToSubmit as any).id;
+        delete (dataToSubmit as any).fiscal_revisado_em;
         await api.patch(`/produtos/${produto.id}/`, dataToSubmit);
       } else {
         await api.post('/produtos/', dataToSubmit);
       }
+      toast.success('Produto salvo com sucesso.');
       onSuccess();
       onClose();
     } catch (err) {
       console.error('Erro ao salvar produto:', err);
+      toast.error(productErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -308,7 +346,9 @@ export default function ProdutoModal({ produto, onClose, onSuccess }: ProdutoMod
                   className="input"
                   style={{ paddingLeft: 36 }}
                   placeholder="0,000"
+                  disabled={Boolean(produto)}
                 />
+                {produto ? <span className="form-hint">Use o ajuste de estoque para alterar o saldo.</span> : null}
               </div>
             </div>
 
@@ -394,20 +434,24 @@ export default function ProdutoModal({ produto, onClose, onSuccess }: ProdutoMod
                 <summary>Classificação fiscal NFC-e / NF-e</summary>
                 <p className="form-hint" style={{ marginTop: 8 }}>Preencha conforme a orientação do contador. O sistema inicia em homologação.</p>
                 <div className="form-grid-12" style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 14, paddingTop: 12 }}>
+                  <div style={{ gridColumn: 'span 4' }}><label className="form-label" htmlFor="produto-tipo-origem">Tipo do produto</label><select id="produto-tipo-origem" className="input" name="tipo_origem_comercial" value={formData.tipo_origem_comercial} onChange={handleChange}><option value="NAO_CLASSIFICADO">Não classificado</option><option value="FABRICACAO_PROPRIA">Fabricação própria</option><option value="REVENDA">Revenda</option><option value="INSUMO">Insumo</option><option value="MISTO">Uso misto</option></select></div>
+                  <div style={{ gridColumn: 'span 4' }}><label className="form-label" htmlFor="produto-confianca-fiscal">Confiança da revisão</label><select id="produto-confianca-fiscal" className="input" name="fiscal_confianca" value={formData.fiscal_confianca} onChange={handleChange}><option value="NAO_REVISADO">Não revisado</option><option value="ALTA">Alta</option><option value="MEDIA">Média</option><option value="BAIXA">Baixa</option></select></div>
+                  <div style={{ gridColumn: 'span 4' }}><label className="form-label" htmlFor="produto-fonte-fiscal">Fonte fiscal</label><input id="produto-fonte-fiscal" className="input" name="fiscal_fonte" value={formData.fiscal_fonte} onChange={handleChange} placeholder="XML fornecedor, Receita, contador..." /></div>
                   <div style={{ gridColumn: 'span 3' }}><label className="form-label">NCM</label><input className="input" name="ncm" maxLength={8} inputMode="numeric" value={formData.ncm} onChange={handleChange} /></div>
                   <div style={{ gridColumn: 'span 3' }}><label className="form-label">CEST</label><input className="input" name="cest" maxLength={7} inputMode="numeric" value={formData.cest} onChange={handleChange} /></div>
                   <div style={{ gridColumn: 'span 3' }}><label className="form-label">CFOP</label><input className="input" name="cfop" maxLength={4} inputMode="numeric" value={formData.cfop} onChange={handleChange} /></div>
                   <div style={{ gridColumn: 'span 3' }}><label className="form-label">CST / CSOSN</label><input className="input" name="cst_icms" maxLength={3} value={formData.cst_icms} onChange={handleChange} /></div>
                   <div style={{ gridColumn: 'span 3' }}><label className="form-label">CST PIS</label><input className="input" name="cst_pis" maxLength={2} inputMode="numeric" value={formData.cst_pis} onChange={handleChange} /></div>
                   <div style={{ gridColumn: 'span 3' }}><label className="form-label">CST COFINS</label><input className="input" name="cst_cofins" maxLength={2} inputMode="numeric" value={formData.cst_cofins} onChange={handleChange} /></div>
-                  <div style={{ gridColumn: 'span 3' }}><label className="form-label">Origem</label><select className="input" name="origem_mercadoria" value={formData.origem_mercadoria} onChange={handleChange}><option value="0">0 — Nacional</option><option value="1">1 — Importação direta</option><option value="2">2 — Mercado interno/importado</option></select></div>
+                  <div style={{ gridColumn: 'span 3' }}><label className="form-label">Origem</label><select className="input" name="origem_mercadoria" value={formData.origem_mercadoria} onChange={handleChange}><option value="0">0 — Nacional</option><option value="1">1 — Importação direta</option><option value="2">2 — Mercado interno/importado</option><option value="3">3 — Nacional, conteúdo importado &gt; 40% e ≤ 70%</option><option value="4">4 — Nacional, processo produtivo básico</option><option value="5">5 — Nacional, conteúdo importado ≤ 40%</option><option value="6">6 — Importação direta sem similar</option><option value="7">7 — Mercado interno/importado sem similar</option><option value="8">8 — Nacional, conteúdo importado &gt; 70%</option></select></div>
                   <div style={{ gridColumn: 'span 3' }}><label className="form-label">Código benefício fiscal</label><input className="input" name="codigo_beneficio_fiscal" maxLength={10} value={formData.codigo_beneficio_fiscal} onChange={handleChange} /></div>
                   <div style={{ gridColumn: 'span 3' }}><label className="form-label">Unidade tributável</label><input className="input" name="unidade_tributavel" maxLength={6} value={formData.unidade_tributavel} onChange={handleChange} /></div>
                   <div style={{ gridColumn: 'span 3' }}><label className="form-label">GTIN tributável</label><input className="input" name="gtin_tributavel" maxLength={14} inputMode="numeric" value={formData.gtin_tributavel} onChange={handleChange} /></div>
                   <div style={{ gridColumn: 'span 3' }}><label className="form-label">Conversão tributável</label><input className="input" name="fator_conversao_tributavel" type="number" step="0.000001" min="0.000001" value={formData.fator_conversao_tributavel} onChange={handleChange} /></div>
-                  <div style={{ gridColumn: 'span 3' }}><label className="form-label">ICMS (%)</label><input className="input" name="aliquota_icms" type="number" step="0.01" min="0" value={formData.aliquota_icms} onChange={handleChange} /></div>
-                  <div style={{ gridColumn: 'span 3' }}><label className="form-label">PIS (%)</label><input className="input" name="aliquota_pis" type="number" step="0.01" min="0" value={formData.aliquota_pis} onChange={handleChange} /></div>
-                  <div style={{ gridColumn: 'span 3' }}><label className="form-label">COFINS (%)</label><input className="input" name="aliquota_cofins" type="number" step="0.01" min="0" value={formData.aliquota_cofins} onChange={handleChange} /></div>
+                  <div style={{ gridColumn: 'span 3' }}><label className="form-label">ICMS (%)</label><input className="input" name="aliquota_icms" type="number" step="0.01" min="0" max="100" value={formData.aliquota_icms} onChange={handleChange} /></div>
+                  <div style={{ gridColumn: 'span 3' }}><label className="form-label">PIS (%)</label><input className="input" name="aliquota_pis" type="number" step="0.01" min="0" max="100" value={formData.aliquota_pis} onChange={handleChange} /></div>
+                  <div style={{ gridColumn: 'span 3' }}><label className="form-label">COFINS (%)</label><input className="input" name="aliquota_cofins" type="number" step="0.01" min="0" max="100" value={formData.aliquota_cofins} onChange={handleChange} /></div>
+                  <div style={{ gridColumn: 'span 12' }}><label className="form-label" htmlFor="produto-observacao-fiscal">Observação da revisão fiscal</label><textarea id="produto-observacao-fiscal" className="input" name="fiscal_observacao" rows={2} value={formData.fiscal_observacao} onChange={handleChange} placeholder="Composição, embalagem, peso e ressalvas usadas na classificação" /></div>
                 </div>
               </details>
             </div>
