@@ -55,9 +55,18 @@ export default function ConfiguracaoFiscal() {
     if (certificado) data.append('certificado', certificado);
     try {
       const response = await api.patch<Config>('/fiscal/configuracao/', data);
+      if (certificado && !response.data.certificado_configurado) {
+        throw new Error('O servidor não confirmou o certificado enviado.');
+      }
       setForm({ ...initial, ...response.data }); setApiKey(''); setSenha(''); setCsc(''); setCertificado(null);
-      toast.success('Configuração fiscal salva com segurança.');
-    } catch { toast.error('Confira os campos fiscais e tente novamente.'); }
+      toast.success(certificado ? `Certificado ${response.data.certificado_nome} salvo com segurança.` : 'Configuração fiscal salva com segurança.');
+    } catch (error) {
+      const detail = error instanceof AxiosError
+        ? (error.response?.data as { detail?: string; certificado?: string[] })?.detail
+          || (error.response?.data as { certificado?: string[] })?.certificado?.join(' ')
+        : error instanceof Error ? error.message : undefined;
+      toast.error(detail || 'Confira os campos fiscais e tente novamente.');
+    }
     finally { setSaving(false); }
   };
 
@@ -86,7 +95,7 @@ export default function ConfiguracaoFiscal() {
         <div><label className="form-label">Ambiente</label><select className="input" value={form.ambiente} onChange={e=>set('ambiente',e.target.value)}><option value="homologacao">Homologação</option><option value="producao">Produção</option></select></div>
         {field('URL da API','api_url')}
         <div><label className="form-label">Chave da API</label><input className="input" type="password" placeholder={form.api_key_configurada?'Já configurada — deixe vazio para manter':'Cole a chave Geranet'} value={apiKey} onChange={e=>setApiKey(e.target.value)}/></div>
-        <div><label className="form-label">Certificado A1</label><input className="input" type="file" accept=".pfx,.p12" onChange={e=>setCertificado(e.target.files?.[0]||null)}/><small>{form.certificado_nome||'Nenhum certificado salvo'}</small></div>
+        <div><label className="form-label">Certificado A1</label><input className="input" type="file" accept=".pfx,.p12,application/x-pkcs12" onChange={e=>setCertificado(e.target.files?.[0]||null)}/><small>{certificado ? `Selecionado: ${certificado.name}` : form.certificado_nome ? `Salvo: ${form.certificado_nome}` : 'Nenhum certificado salvo'}</small></div>
         <div><label className="form-label">Senha do certificado</label><input className="input" type="password" placeholder={form.certificado_senha_configurada?'Já configurada — deixe vazio para manter':'Senha do A1'} value={senha} onChange={e=>setSenha(e.target.value)}/></div>
       </div>
       <h2 style={{marginTop:28}}>Empresa emitente</h2>

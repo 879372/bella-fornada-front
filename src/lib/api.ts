@@ -5,9 +5,6 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 // Helper to extract a friendly error message from complex API responses
@@ -39,6 +36,12 @@ api.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}` ;
+  }
+  // O navegador precisa criar o Content-Type multipart com seu boundary.
+  // Um default application/json transforma FormData (incluindo certificados)
+  // em um objeto vazio antes do envio.
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
   }
   return config;
 });
