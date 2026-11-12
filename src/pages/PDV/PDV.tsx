@@ -31,6 +31,15 @@ import ProdutoModal from '../Produtos/ProdutoModal';
 import Modal from '../../components/Modal';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 
+type DocumentoFiscalPdv = {
+  id: string;
+  status: string;
+  status_display: string;
+  numero?: string;
+  mensagem_sefaz?: string;
+  pode_baixar_pdf: boolean;
+};
+
 const FORMAS_PAGAMENTO = [
   { key: 'DINHEIRO', label: 'Dinheiro', icon: Banknote, color: 'var(--accent-green)' },
   { key: 'PIX', label: 'Pix', icon: QrCode, color: 'var(--accent)' },
@@ -129,6 +138,7 @@ export default function PDV() {
   // Impressão de comprovante
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printData, setPrintData] = useState<CupomDados | null>(null);
+  const [documentoFiscal, setDocumentoFiscal] = useState<DocumentoFiscalPdv | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
 
@@ -139,6 +149,7 @@ export default function PDV() {
     else localStorage.removeItem('pdv_venda');
   }, [carrinho, venda]);
   const [showPagamento, setShowPagamento] = useState(false);
+  const [emitirNfce, setEmitirNfce] = useState(false);
   const [fundoInicial, setFundoInicial] = useState('');
   const [activeTab, setActiveTab] = useState<'search' | 'cart'>('search');
 
@@ -315,23 +326,44 @@ export default function PDV() {
   });
 
   const finalizarVendaMutation = useMutation({
-    mutationFn: async (pagamentos: Pagamento[]) => {
+    mutationFn: async ({ pagamentos, emitirNfceSelecionada }: { pagamentos: Pagamento[]; emitirNfceSelecionada: boolean }) => {
       const respVenda = await api.post(`/vendas/${venda?.id}/finalizar/`, {
         pagamentos,
         cliente: clienteId,
         desconto: valorDescontoReal.toFixed(2)
       });
-
-      return respVenda;
+      let fiscal: DocumentoFiscalPdv | null = null;
+      let erroFiscal = '';
+      if (emitirNfceSelecionada) {
+        try {
+          const response = await api.post<DocumentoFiscalPdv>('/fiscal/documentos/emitir/', {
+            venda: respVenda.data.id || venda?.id,
+            tipo: 'NFCE',
+            canal: 'PDV',
+          });
+          fiscal = response.data;
+          if (fiscal.status !== 'AUTORIZADA') {
+            erroFiscal = fiscal.mensagem_sefaz || `NFC-e ${fiscal.status_display.toLowerCase()}.`;
+          }
+        } catch (error: any) {
+          erroFiscal = error.response?.data?.detail || 'Não foi possível emitir a NFC-e.';
+        }
+      }
+      return { respVenda, fiscal, erroFiscal };
     },
-    onSuccess: (respVenda, pagamentos) => {
-      toast.success('Venda finalizada!');
+    onSuccess: ({ respVenda, fiscal, erroFiscal }, variables) => {
+      if (fiscal?.status === 'AUTORIZADA') toast.success('Venda finalizada e NFC-e autorizada!');
+      else {
+        toast.success('Venda finalizada!');
+        if (erroFiscal) toast.error(`Venda concluída, mas a NFC-e não foi autorizada: ${erroFiscal}`);
+      }
       setShowPagamento(false);
+      setDocumentoFiscal(fiscal);
 
       // Sempre prepara os dados de impressão/compartilhamento e exibe o modal de sucesso
-      const pagoCentavos = pagamentos.reduce((acc, p) => acc + toCents(p.valor), 0);
+      const pagoCentavos = variables.pagamentos.reduce((acc, p) => acc + toCents(p.valor), 0);
       setPrintData(cupomDaVenda(respVenda.data, {
-        pagamentos: [...pagamentos],
+        pagamentos: [...variables.pagamentos],
         troco: Math.max(0, pagoCentavos - totalLiquidoCentavos) / 100,
       }));
       setShowPrintModal(true);
@@ -346,6 +378,7 @@ export default function PDV() {
       setDesconto(0);
       setTipoDesconto('VALOR');
       setShowDesconto(false);
+      setEmitirNfce(false);
       setTimeout(() => buscaRef.current?.focus(), 100);
     },
     onError: (err: any) => {
@@ -363,6 +396,18 @@ export default function PDV() {
     } catch (error: any) {
       console.error(error);
       toast.error(error?.message || 'Erro ao imprimir o cupom.');
+    }
+  };
+
+  const handleAbrirDanfce = async () => {
+    if (!documentoFiscal?.pode_baixar_pdf) return;
+    try {
+      const response = await api.get(`/fiscal/documentos/${documentoFiscal.id}/pdf/`, { responseType: 'blob' });
+      const url = URL.createObjectURL(response.data);
+      window.open(url, '_blank', 'noopener,noreferrer');
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      toast.error('Não foi possível abrir o DANFC-e.');
     }
   };
 
@@ -594,7 +639,7 @@ export default function PDV() {
       toast.error('O pagamento não cobre o total da venda.');
       return;
     }
-    finalizarVendaMutation.mutate(pagamentos);
+    finalizarVendaMutation.mutate({ pagamentos, emitirNfceSelecionada: emitirNfce });
   };
 
   const handleAddPagamento = () => {
@@ -1170,6 +1215,18 @@ export default function PDV() {
                         </div>
                       )}
                    </div>
+                   <label style={{ marginTop: 18, padding: 14, border: '1px solid var(--border)', borderRadius: 10, display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer' }}>
+                     <input
+                       type="checkbox"
+                       checked={emitirNfce}
+                       onChange={event => setEmitirNfce(event.target.checked)}
+                       style={{ marginTop: 3 }}
+                     />
+                     <span>
+                       <strong style={{ display: 'block' }}>Emitir NFC-e</strong>
+                       <small style={{ color: 'var(--text-muted)' }}>Envia a nota para a SEFAZ após concluir a venda.</small>
+                     </span>
+                   </label>
                 </div>
             </div>
 
@@ -1270,7 +1327,7 @@ export default function PDV() {
 
       {showPrintModal && (
         <Modal
-          onClose={() => { setShowPrintModal(false); setPrintData(null); }}
+          onClose={() => { setShowPrintModal(false); setPrintData(null); setDocumentoFiscal(null); }}
           labelledBy="print-sale-title"
           describedBy="print-sale-description"
           overlayClassName="modal-overlay-raised"
@@ -1281,20 +1338,23 @@ export default function PDV() {
                   <FileText size={32} />
                </div>
              </div>
-             <h3 id="print-sale-title" style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: 12 }}>Venda Concluída!</h3>
+             <h3 id="print-sale-title" style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: 12 }}>{documentoFiscal?.status === 'AUTORIZADA' ? 'Venda concluída e NFC-e autorizada!' : 'Venda Concluída!'}</h3>
              <p id="print-sale-description" style={{ color: 'var(--text-secondary)', marginBottom: 24, fontSize: '0.9rem' }}>
-               Deseja imprimir o comprovante desta venda?
+               {documentoFiscal?.status === 'AUTORIZADA'
+                 ? `NFC-e nº ${documentoFiscal.numero || 'autorizada'}. Você pode abrir o DANFC-e para impressão.`
+                 : 'Deseja imprimir o comprovante desta venda?'}
              </p>
              <div style={{ display: 'flex', gap: 10 }}>
                <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => {
                  setShowPrintModal(false);
                  setPrintData(null);
+                 setDocumentoFiscal(null);
                }}>
                  Fechar
                </button>
-               <button className="btn btn-primary" style={{ flex: 1, background: '#10b981' }} onClick={handleImprimir} autoFocus>
+               <button className="btn btn-primary" style={{ flex: 1, background: '#10b981' }} onClick={documentoFiscal?.pode_baixar_pdf ? handleAbrirDanfce : handleImprimir} autoFocus>
                  <Printer size={18} />
-                 Imprimir
+                 {documentoFiscal?.pode_baixar_pdf ? 'Abrir DANFC-e' : 'Imprimir'}
                </button>
              </div>
         </Modal>
