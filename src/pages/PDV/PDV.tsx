@@ -149,7 +149,6 @@ export default function PDV() {
     else localStorage.removeItem('pdv_venda');
   }, [carrinho, venda]);
   const [showPagamento, setShowPagamento] = useState(false);
-  const [emitirNfce, setEmitirNfce] = useState(false);
   const [fundoInicial, setFundoInicial] = useState('');
   const [activeTab, setActiveTab] = useState<'search' | 'cart'>('search');
 
@@ -378,7 +377,6 @@ export default function PDV() {
       setDesconto(0);
       setTipoDesconto('VALOR');
       setShowDesconto(false);
-      setEmitirNfce(false);
       setTimeout(() => buscaRef.current?.focus(), 100);
     },
     onError: (err: any) => {
@@ -619,7 +617,7 @@ export default function PDV() {
    * digitado no campo, ele entra como pagamento na forma selecionada, para
    * que F2 → F4 finalize direto com o valor sugerido.
    */
-  const concluirVenda = () => {
+  const concluirVenda = (transmitirNfce = false) => {
     if (finalizarVendaMutation.isPending) return;
 
     let pagamentos = pagamentosRealizados;
@@ -639,7 +637,7 @@ export default function PDV() {
       toast.error('O pagamento não cobre o total da venda.');
       return;
     }
-    finalizarVendaMutation.mutate({ pagamentos, emitirNfceSelecionada: emitirNfce });
+    finalizarVendaMutation.mutate({ pagamentos, emitirNfceSelecionada: transmitirNfce });
   };
 
   const handleAddPagamento = () => {
@@ -1215,29 +1213,24 @@ export default function PDV() {
                         </div>
                       )}
                    </div>
-                   <label style={{ marginTop: 18, padding: 14, border: '1px solid var(--border)', borderRadius: 10, display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer' }}>
-                     <input
-                       type="checkbox"
-                       checked={emitirNfce}
-                       onChange={event => setEmitirNfce(event.target.checked)}
-                       style={{ marginTop: 3 }}
-                     />
-                     <span>
-                       <strong style={{ display: 'block' }}>Emitir NFC-e</strong>
-                       <small style={{ color: 'var(--text-muted)' }}>Envia a nota para a SEFAZ após concluir a venda.</small>
-                     </span>
-                   </label>
                 </div>
             </div>
 
             <div className={`pdv-payment-actions${isMobile ? ' mobile' : ''}`}>
-               <button className="btn btn-primary" style={{ flex: 1, height: 50, fontSize: '1rem', fontWeight: 800, background: 'var(--accent-green)' }}
-                 onClick={concluirVenda}
+               <button className="btn btn-ghost" style={{ flex: 1, height: 50, fontSize: '1rem', fontWeight: 800 }}
+                 onClick={() => concluirVenda(false)}
                  disabled={finalizarVendaMutation.isPending}
                  aria-keyshortcuts="F4"
                >
                   <CheckCircle2 size={20} />
-                  {finalizarVendaMutation.isPending ? 'CONCLUINDO...' : 'CONCLUIR VENDA (F4)'}
+                  {finalizarVendaMutation.isPending ? 'CONCLUINDO...' : 'FINALIZAR VENDA (F4)'}
+               </button>
+               <button className="btn btn-primary" style={{ flex: 1, height: 50, fontSize: '1rem', fontWeight: 800, background: 'var(--accent-green)' }}
+                 onClick={() => concluirVenda(true)}
+                 disabled={finalizarVendaMutation.isPending}
+               >
+                  <FileText size={20} />
+                  {finalizarVendaMutation.isPending ? 'TRANSMITINDO...' : 'FINALIZAR E TRANSMITIR NFC-e'}
                </button>
             </div>
         </Modal>
