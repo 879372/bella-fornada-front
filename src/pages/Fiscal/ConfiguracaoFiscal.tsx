@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Save, ShieldCheck, BadgeCheck } from 'lucide-react';
 import { toast } from 'sonner';
+import { AxiosError } from 'axios';
 import api from '../../lib/api';
 
 type Config = {
@@ -65,7 +66,12 @@ export default function ConfiguracaoFiscal() {
     try {
       const { data } = await api.post<{ valido: boolean; valido_ate: string }>('/fiscal/configuracao/validar/');
       toast.success(`Configuração válida. Certificado até ${new Date(data.valido_ate).toLocaleDateString('pt-BR')}.`);
-    } catch { toast.error('A configuração ou o certificado A1 ainda não estão válidos.'); }
+    } catch (error) {
+      const detail = error instanceof AxiosError
+        ? (error.response?.data as { detail?: string })?.detail
+        : undefined;
+      toast.error(detail || 'A configuração ou o certificado A1 ainda não estão válidos.');
+    }
     finally { setValidating(false); }
   };
 
