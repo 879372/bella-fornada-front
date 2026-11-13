@@ -1,16 +1,19 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
-import { Ban, Download, FileCheck2, FileText, RefreshCw, Repeat2, ReceiptText, XCircle } from 'lucide-react';
+import { Activity, Ban, Download, FileCheck2, FileText, PenLine, RefreshCw, Repeat2, ReceiptText, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '../../lib/api';
 import { useAuthStore } from '../../store/authStore';
 
 type FiscalType = 'NFCE' | 'NFE';
 type VendaElegivel = { id: number; data: string; cliente_nome?: string; total_liquido: string; itens_count: number };
-type Documento = { id: string; venda_numero: number; tipo: FiscalType; tipo_display: string; status: string; status_display: string; ambiente: string; mensagem_sefaz?: string; numero?: string; serie?: string; chave_acesso?: string; pode_baixar_xml: boolean; pode_baixar_pdf: boolean };
+type Documento = { id: string; venda_numero: number; tipo: FiscalType; tipo_display: string; status: string; status_display: string; ambiente: string; mensagem_sefaz?: string; numero?: string; serie?: string; chave_acesso?: string; pode_baixar_xml: boolean; pode_baixar_pdf: boolean; pode_cancelar: boolean; prazo_cancelamento_em?: string | null; motivo_cancelamento?: string };
 type Inutilizacao = { id_externo: string; tipo_display: string; ambiente: string; status: string; status_display: string; serie: string; ano: number; numero_inicial: number; numero_final: number; mensagem_sefaz?: string; protocolo?: string; pode_baixar_xml: boolean; created_at: string };
 type ConfigFiscal = { ambiente: 'homologacao' | 'producao'; serie_nfce: string; serie_nfe: string };
+type FiscalAlert = { nivel: 'ERRO' | 'AVISO' | 'INFO'; codigo: string; titulo: string; descricao: string; quantidade: number };
+type FiscalMonitor = { ambiente: string; certificado: { status: string; valido_ate?: string | null; dias_restantes?: number | null; mensagem: string }; resumo: { autorizadas: number; canceladas: number; rejeitadas: number; indefinidas: number; erros: number; processando_atrasadas: number; vendas_sem_documento: number }; contingencia: { suportada: boolean; motivo: string }; alertas: FiscalAlert[] };
+type CartaCorrecao = { id_externo: string; documento: string; documento_numero: string; documento_serie: string; sequencia: number; texto_correcao: string; status: string; status_display: string; mensagem_sefaz?: string; protocolo?: string; pode_baixar_xml: boolean; created_at: string };
 type ApiError = { detail?: string; [key: string]: unknown };
 
 const money = (value: string | number) => Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -39,6 +42,8 @@ export default function Fiscal() {
     queryClient.invalidateQueries({ queryKey: ['fiscal-vendas-elegiveis'] });
     queryClient.invalidateQueries({ queryKey: ['fiscal-documentos'] });
     queryClient.invalidateQueries({ queryKey: ['fiscal-inutilizacoes'] });
+    queryClient.invalidateQueries({ queryKey: ['fiscal-monitor'] });
+    queryClient.invalidateQueries({ queryKey: ['fiscal-cartas-correcao'] });
   };
   const eligible = useQuery<VendaElegivel[]>({
     queryKey: ['fiscal-vendas-elegiveis'],
@@ -58,6 +63,16 @@ export default function Fiscal() {
     enabled: canManage,
     queryFn: async () => { const { data } = await api.get('/fiscal/inutilizacoes/'); return data.results || data; },
   });
+  const monitor = useQuery<FiscalMonitor>({
+    queryKey: ['fiscal-monitor'],
+    enabled: canManage,
+    queryFn: async () => (await api.get('/fiscal/monitor/')).data,
+  });
+  const correctionLetters = useQuery<CartaCorrecao[]>({
+    queryKey: ['fiscal-cartas-correcao'],
+    enabled: canManage,
+    queryFn: async () => { const { data } = await api.get('/fiscal/cartas-correcao/'); return data.results || data; },
+  });
 
   const issue = useMutation({
     mutationFn: ({ venda, tipo }: { venda: number; tipo: FiscalType }) => api.post<Documento>('/fiscal/documentos/emitir/', { venda, tipo, canal: 'PDV' }),
@@ -66,7 +81,7 @@ export default function Fiscal() {
       else toast.error(data.mensagem_sefaz || `${data.tipo_display} retornou como ${data.status_display}.`);
       refresh();
     },
-    onError: (error: unknown) => toast.error(errorMessage(error, 'Não foi possível emitir o documento fiscal.')),
+    onError: (error: unknown) => { toast.error(errorMessage(error, 'Não foi possível emitir o documento fiscal.')); refresh(); },
   });
   const cancel = useMutation({
     mutationFn: ({ id, justificativa }: { id: string; justificativa: string }) => api.post(`/fiscal/documentos/${id}/cancelar/`, { justificativa }),
@@ -84,10 +99,23 @@ export default function Fiscal() {
     },
     onError: (error: unknown) => toast.error(errorMessage(error, 'Não foi possível inutilizar a numeração.')),
   });
+  const correct = useMutation({
+    mutationFn: ({ id, texto }: { id: string; texto: string }) => api.post<CartaCorrecao>(`/fiscal/documentos/${id}/carta-correcao/`, { texto_correcao: texto }),
+    onSuccess: ({ data }) => {
+      if (data.status === 'REGISTRADA') toast.success(`Carta de Correção nº ${data.sequencia} registrada na SEFAZ.`);
+      else toast.error(data.mensagem_sefaz || 'A SEFAZ não confirmou a Carta de Correção.');
+      refresh();
+    },
+    onError: (error: unknown) => { toast.error(errorMessage(error, 'Não foi possível registrar a Carta de Correção.')); refresh(); },
+  });
 
   const cancelDocument = (document: Documento) => {
     const reason = window.prompt('Justificativa do cancelamento (mínimo de 15 caracteres):');
     if (reason) cancel.mutate({ id: document.id, justificativa: reason });
+  };
+  const correctDocument = (document: Documento) => {
+    const text = window.prompt('Descreva exatamente a correção da NF-e (mínimo de 15 caracteres). Não é permitido alterar valores, impostos, remetente ou destinatário:');
+    if (text) correct.mutate({ id: document.id, texto: text });
   };
   const download = async (document: Documento, format: 'xml' | 'pdf') => {
     try {
@@ -136,6 +164,17 @@ export default function Fiscal() {
       URL.revokeObjectURL(url);
     } catch (error) { toast.error(errorMessage(error, 'Não foi possível obter o XML da inutilização.')); }
   };
+  const downloadCorrectionXml = async (record: CartaCorrecao) => {
+    try {
+      const response = await api.get(`/fiscal/cartas-correcao/${record.id_externo}/xml/`, { responseType: 'blob' });
+      const url = URL.createObjectURL(response.data);
+      const anchor = window.document.createElement('a');
+      anchor.href = url;
+      anchor.download = `carta-correcao-${record.documento_numero}-${record.sequencia}.xml`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (error) { toast.error(errorMessage(error, 'Não foi possível obter o XML da Carta de Correção.')); }
+  };
 
   const environment = config.data?.ambiente;
   return <div className="animate-in">
@@ -146,12 +185,26 @@ export default function Fiscal() {
       <small style={{ display: 'block', color: 'var(--text-muted)', marginTop: 4 }}>{environment === 'producao' ? 'As operações desta tela têm validade fiscal real.' : 'Operações de teste, sem validade fiscal.'}</small>
     </div>}
 
+    {canManage && <div className="card" style={{ marginBottom: 20, padding: 20 }}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 14 }}><div><h2 style={{ margin: 0, fontSize: '1rem' }}><Activity size={18} style={{ verticalAlign: 'middle', marginRight: 7 }} />Monitor fiscal</h2><small style={{ color: 'var(--text-muted)' }}>{monitor.data?.certificado.mensagem || 'Verificando integração fiscal...'}</small></div><button className="btn btn-ghost btn-sm" onClick={refresh}><RefreshCw size={15} />Atualizar</button></header>
+      {monitor.isLoading ? <div className="loading">Analisando situação fiscal...</div> : monitor.data && <><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 14 }}>{[
+        ['Autorizadas', monitor.data.resumo.autorizadas],
+        ['Rejeitadas', monitor.data.resumo.rejeitadas],
+        ['Indefinidas', monitor.data.resumo.indefinidas],
+        ['Erros', monitor.data.resumo.erros],
+        ['Vendas sem nota', monitor.data.resumo.vendas_sem_documento],
+      ].map(([label, value]) => <div key={String(label)} style={{ padding: 12, border: '1px solid var(--border)', borderRadius: 8 }}><small style={{ color: 'var(--text-muted)' }}>{label}</small><strong style={{ display: 'block', fontSize: '1.3rem' }}>{value}</strong></div>)}</div>
+      {monitor.data.alertas.length ? <div style={{ display: 'grid', gap: 8 }}>{monitor.data.alertas.map((alert) => <div key={alert.codigo} style={{ padding: 10, borderRadius: 8, border: `1px solid ${alert.nivel === 'ERRO' ? '#ef4444' : alert.nivel === 'AVISO' ? '#f59e0b' : 'var(--border)'}` }}><strong>{alert.titulo}{alert.quantidade > 1 ? ` (${alert.quantidade})` : ''}</strong><small style={{ display: 'block', color: 'var(--text-muted)', marginTop: 3 }}>{alert.descricao}</small></div>)}</div> : <p style={{ color: 'var(--text-muted)', margin: 0 }}>Nenhum alerta fiscal encontrado.</p>}</>}
+    </div>}
+
     <div className="card" style={{ marginBottom: 20, padding: 20 }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 14 }}><div><h2 style={{ margin: 0, fontSize: '1rem' }}><ReceiptText size={18} style={{ verticalAlign: 'middle', marginRight: 7 }} />Vendas prontas para emitir</h2><small style={{ color: 'var(--text-muted)' }}>NFC-e para consumidor final; NF-e exige cliente e endereço fiscal completos.</small></div><button className="btn btn-ghost btn-sm" onClick={refresh}><RefreshCw size={15} />Atualizar</button></header>
       {eligible.isLoading ? <div className="loading">Carregando vendas...</div> : eligible.data?.length ? <div className="table-wrapper"><table className="table"><thead><tr><th>Venda</th><th>Cliente</th><th>Itens</th><th>Total</th><th /></tr></thead><tbody>{eligible.data.map((venda) => <tr key={venda.id}><td>#{venda.id}</td><td>{venda.cliente_nome || 'Consumidor final'}</td><td>{venda.itens_count}</td><td>{money(venda.total_liquido)}</td><td style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}><button className="btn btn-primary btn-sm" disabled={issue.isPending} onClick={() => issue.mutate({ venda: venda.id, tipo: 'NFCE' })}><FileCheck2 size={15} />NFC-e</button><button className="btn btn-ghost btn-sm" disabled={issue.isPending || !venda.cliente_nome} onClick={() => issue.mutate({ venda: venda.id, tipo: 'NFE' })}><FileText size={15} />NF-e</button></td></tr>)}</tbody></table></div> : <p style={{ color: 'var(--text-muted)', margin: 0 }}>Nenhuma venda finalizada aguardando emissão.</p>}
     </div>
 
-    <div className="card" style={{ padding: 20, marginBottom: 20 }}><h2 style={{ margin: '0 0 14px', fontSize: '1rem' }}>Documentos recentes</h2>{documents.isLoading ? <div className="loading">Carregando documentos...</div> : documents.data?.length ? <div className="table-wrapper"><table className="table"><thead><tr><th>Venda</th><th>Documento</th><th>Status</th><th>Ambiente</th><th /></tr></thead><tbody>{documents.data.map((document) => <tr key={document.id}><td>#{document.venda_numero}</td><td>{document.tipo_display}{document.numero && <small style={{ display: 'block' }}>Nº {document.numero} · Série {document.serie}</small>}</td><td><span className={`badge ${document.status === 'AUTORIZADA' ? 'badge-green' : document.status === 'REJEITADA' || document.status === 'ERRO' ? 'badge-red' : 'badge-yellow'}`}>{document.status_display}</span>{document.mensagem_sefaz && <small style={{ display: 'block', color: 'var(--text-muted)' }}>{document.mensagem_sefaz}</small>}</td><td>{document.ambiente}</td><td style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>{document.status === 'REJEITADA' && <button className="btn btn-primary btn-sm" disabled={issue.isPending} onClick={() => issue.mutate({ venda: document.venda_numero, tipo: document.tipo })}><Repeat2 size={14} />Reenviar</button>}{document.pode_baixar_xml && <button className="btn btn-ghost btn-sm" onClick={() => download(document, 'xml')}><Download size={14} />XML</button>}{document.pode_baixar_pdf && <button className="btn btn-ghost btn-sm" onClick={() => download(document, 'pdf')}><Download size={14} />PDF</button>}{document.status === 'AUTORIZADA' && <button className="btn btn-ghost btn-sm" disabled={cancel.isPending} onClick={() => cancelDocument(document)}><XCircle size={14} />Cancelar</button>}</td></tr>)}</tbody></table></div> : <p style={{ color: 'var(--text-muted)', margin: 0 }}>Nenhum documento fiscal emitido.</p>}</div>
+    <div className="card" style={{ padding: 20, marginBottom: 20 }}><h2 style={{ margin: '0 0 14px', fontSize: '1rem' }}>Documentos recentes</h2>{documents.isLoading ? <div className="loading">Carregando documentos...</div> : documents.data?.length ? <div className="table-wrapper"><table className="table"><thead><tr><th>Venda</th><th>Documento</th><th>Status</th><th>Ambiente</th><th /></tr></thead><tbody>{documents.data.map((document) => <tr key={document.id}><td>#{document.venda_numero}</td><td>{document.tipo_display}{document.numero && <small style={{ display: 'block' }}>Nº {document.numero} · Série {document.serie}</small>}</td><td><span className={`badge ${document.status === 'AUTORIZADA' ? 'badge-green' : ['REJEITADA', 'ERRO', 'INDEFINIDO'].includes(document.status) ? 'badge-red' : 'badge-yellow'}`}>{document.status_display}</span>{document.mensagem_sefaz && <small style={{ display: 'block', color: 'var(--text-muted)' }}>{document.mensagem_sefaz}</small>}{document.status === 'AUTORIZADA' && !document.pode_cancelar && <small style={{ display: 'block', color: '#ef4444' }}>{document.motivo_cancelamento}</small>}</td><td>{document.ambiente}</td><td style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>{document.status === 'REJEITADA' && <button className="btn btn-primary btn-sm" disabled={issue.isPending} onClick={() => issue.mutate({ venda: document.venda_numero, tipo: document.tipo })}><Repeat2 size={14} />Reenviar</button>}{document.pode_baixar_xml && <button className="btn btn-ghost btn-sm" onClick={() => download(document, 'xml')}><Download size={14} />XML</button>}{document.pode_baixar_pdf && <button className="btn btn-ghost btn-sm" onClick={() => download(document, 'pdf')}><Download size={14} />PDF</button>}{canManage && document.tipo === 'NFE' && document.status === 'AUTORIZADA' && <button className="btn btn-ghost btn-sm" disabled={correct.isPending} onClick={() => correctDocument(document)}><PenLine size={14} />CC-e</button>}{document.pode_cancelar && <button className="btn btn-ghost btn-sm" disabled={cancel.isPending} onClick={() => cancelDocument(document)}><XCircle size={14} />Cancelar</button>}</td></tr>)}</tbody></table></div> : <p style={{ color: 'var(--text-muted)', margin: 0 }}>Nenhum documento fiscal emitido.</p>}</div>
+
+    {canManage && correctionLetters.data?.length ? <div className="card" style={{ padding: 20, marginBottom: 20 }}><h2 style={{ margin: '0 0 14px', fontSize: '1rem' }}>Cartas de Correção</h2><div className="table-wrapper"><table className="table"><thead><tr><th>NF-e</th><th>Sequência</th><th>Correção</th><th>Status</th><th>Protocolo</th><th /></tr></thead><tbody>{correctionLetters.data.map((record) => <tr key={record.id_externo}><td>Nº {record.documento_numero} · Série {record.documento_serie}</td><td>{record.sequencia}</td><td>{record.texto_correcao}</td><td><span className={`badge ${record.status === 'REGISTRADA' ? 'badge-green' : 'badge-red'}`}>{record.status_display}</span>{record.mensagem_sefaz && <small style={{ display: 'block', color: 'var(--text-muted)' }}>{record.mensagem_sefaz}</small>}</td><td>{record.protocolo || '—'}</td><td>{record.pode_baixar_xml && <button className="btn btn-ghost btn-sm" onClick={() => downloadCorrectionXml(record)}><Download size={14} />XML</button>}</td></tr>)}</tbody></table></div></div> : null}
 
     {canManage && <div className="card" style={{ padding: 20 }}>
       <h2 style={{ margin: '0 0 6px', fontSize: '1rem' }}><Ban size={18} style={{ verticalAlign: 'middle', marginRight: 7 }} />Inutilizar numeração</h2>
