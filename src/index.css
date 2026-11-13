@@ -389,22 +389,31 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .product-actions {
-  display: flex;
+  display: inline-flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 2px;
+  padding: 3px;
+  float: right;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg-primary) 72%, white);
 }
 
 .product-action-btn {
-  width: 46px;
-  min-width: 46px;
-  height: 46px;
-  min-height: 46px;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  min-height: 34px;
   padding: 0;
-  color: var(--text-primary);
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
-  box-shadow: 0 1px 3px rgba(21, 28, 42, 0.1);
-  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 7px;
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease, transform 0.15s ease;
 }
 
 .product-action-btn svg {
@@ -414,15 +423,31 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .product-action-btn:hover {
   transform: translateY(-1px);
-  color: var(--text-primary);
-  background: var(--bg-hover);
-  border-color: var(--text-muted);
-  box-shadow: 0 4px 9px rgba(21, 28, 42, 0.2);
+}
+
+.product-action-btn.is-edit:hover {
+  color: var(--accent);
+  background: rgba(99, 57, 45, 0.1);
+}
+
+.product-action-btn.is-history:hover {
+  color: var(--accent-yellow);
+  background: rgba(154, 93, 63, 0.1);
+}
+
+.product-action-btn.is-disable:hover {
+  color: var(--accent-red);
+  background: rgba(200, 63, 63, 0.1);
+}
+
+.product-action-btn.is-enable:hover {
+  color: var(--accent-green);
+  background: rgba(22, 129, 95, 0.1);
 }
 
 .product-action-btn:focus-visible {
-  outline: 3px solid rgba(37, 99, 235, 0.3);
-  outline-offset: 2px;
+  outline: 2px solid rgba(99, 57, 45, 0.36);
+  outline-offset: 1px;
 }
 
 /* ========================

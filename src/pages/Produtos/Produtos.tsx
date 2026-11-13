@@ -7,9 +7,8 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
-  Edit3,
-  ToggleLeft,
-  ToggleRight,
+  Pencil,
+  Power,
   History
 } from 'lucide-react';
 import KardexModal from './KardexModal';
@@ -145,10 +144,10 @@ export default function Produtos() {
                   R$ {Number(p.preco_venda).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </div>
                 <div className="m-card-actions" onClick={(event) => event.stopPropagation()}>
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => handleEdit(p)}><Edit3 size={16} /> Editar</button>
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => handleKardex(p)}><History size={16} /> Histórico</button>
-                  <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => handleToggle(p)} aria-label={`${p.ativo ? 'Desativar' : 'Ativar'} ${p.nome}`}>
-                    {p.ativo ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
+                  <button type="button" className="btn btn-ghost btn-sm product-mobile-action" onClick={() => handleEdit(p)}><Pencil size={15} /> Editar</button>
+                  <button type="button" className="btn btn-ghost btn-sm product-mobile-action" onClick={() => handleKardex(p)}><History size={15} /> Histórico</button>
+                  <button type="button" className={`btn btn-ghost btn-sm product-mobile-action ${p.ativo ? 'is-disable' : 'is-enable'}`} onClick={() => handleToggle(p)} aria-label={`${p.ativo ? 'Desativar' : 'Ativar'} ${p.nome}`}>
+                    <Power size={15} /> {p.ativo ? 'Pausar' : 'Ativar'}
                   </button>
                 </div>
               </div>
@@ -205,20 +204,20 @@ export default function Produtos() {
                     </td>
                     <td>
                       <div className="product-actions">
-                        <button type="button" className="btn product-action-btn" onClick={(event) => { event.stopPropagation(); handleEdit(p); }} title="Editar" aria-label={`Editar ${p.nome}`}>
-                          <Edit3 size={23} strokeWidth={2.5} aria-hidden="true" />
+                        <button type="button" className="product-action-btn is-edit" onClick={(event) => { event.stopPropagation(); handleEdit(p); }} title="Editar produto" aria-label={`Editar ${p.nome}`}>
+                          <Pencil size={17} strokeWidth={2} aria-hidden="true" />
                         </button>
-                        <button type="button" className="btn product-action-btn" onClick={(event) => { event.stopPropagation(); handleKardex(p); }} title="Histórico (Kardex)" aria-label={`Histórico de ${p.nome}`}>
-                          <History size={23} strokeWidth={2.5} aria-hidden="true" />
+                        <button type="button" className="product-action-btn is-history" onClick={(event) => { event.stopPropagation(); handleKardex(p); }} title="Ver histórico de estoque" aria-label={`Histórico de ${p.nome}`}>
+                          <History size={17} strokeWidth={2} aria-hidden="true" />
                         </button>
                         <button
                           type="button"
-                          className="btn product-action-btn"
+                          className={`product-action-btn ${p.ativo ? 'is-disable' : 'is-enable'}`}
                           onClick={(event) => { event.stopPropagation(); handleToggle(p); }}
-                          title={p.ativo ? 'Desativar' : 'Ativar'}
+                          title={p.ativo ? 'Pausar produto' : 'Ativar produto'}
                           aria-label={`${p.ativo ? 'Desativar' : 'Ativar'} ${p.nome}`}
                         >
-                          {p.ativo ? <ToggleRight size={24} strokeWidth={2.5} aria-hidden="true" /> : <ToggleLeft size={24} strokeWidth={2.5} aria-hidden="true" />}
+                          <Power size={17} strokeWidth={2} aria-hidden="true" />
                         </button>
                       </div>
                     </td>
