@@ -12,8 +12,6 @@ import {
   Printer,
   FileCheck2,
   FileText,
-  ReceiptText,
-  RefreshCw,
 } from 'lucide-react';
 import { cupomDaVenda } from '../../lib/cupom';
 import { imprimirCupom } from '../../lib/impressao';
@@ -21,6 +19,7 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import ConfirmModal from '../../components/ConfirmModal';
 import Modal from '../../components/Modal';
+import TotalsCards, { type Totals } from '../../components/TotalsCards';
 import FilterPanel from '../../components/FilterPanel';
 import InfiniteScroll from '../../components/InfiniteScroll';
 import { usePaginatedList } from '../../hooks/usePaginatedList';
@@ -61,27 +60,10 @@ type VendaElegivel = { id: number; data: string; cliente_nome?: string; total_li
 type DocumentoFiscal = { tipo_display: string; status: string; status_display: string; mensagem_sefaz?: string };
 type Paginated<T> = { count: number; next?: string | null; previous?: string | null; results: T[] };
 
-const FISCAL_PAGE_SIZE = 50;
-const normalizePage = <T,>(data: Paginated<T> | T[]): Paginated<T> => (
-  Array.isArray(data)
-    ? { count: data.length, next: null, previous: null, results: data }
-    : data
-);
-
 const formatCurrency = (val: any) => {
   const num = Number(val);
   return isNaN(num) ? '0,00' : num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
-
-function ReadySalesPagination({ page, count, onChange }: { page: number; count: number; onChange: (page: number) => void }) {
-  const pages = Math.max(1, Math.ceil(count / FISCAL_PAGE_SIZE));
-  if (pages <= 1) return null;
-  return <div className="pagination-bar">
-    <button className="btn btn-ghost btn-sm" disabled={page <= 1} onClick={() => onChange(page - 1)}>Anterior</button>
-    <span>Página {page} de {pages} · {count} vendas</span>
-    <button className="btn btn-ghost btn-sm" disabled={page >= pages} onClick={() => onChange(page + 1)}>Próxima</button>
-  </div>;
-}
 
 export default function Vendas() {
   const queryClient = useQueryClient();
@@ -90,7 +72,7 @@ export default function Vendas() {
   const [statusFilter, setStatusFilter] = useState('');
   // Sem data por padrão: mostra todas as vendas (a API já ordena das mais recentes).
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
-  const [eligiblePage, setEligiblePage] = useState(1);
+  const [issueConfirmation, setIssueConfirmation] = useState<{ venda: number; tipo: FiscalType } | null>(null);
   const [selectedVenda, setSelectedVenda] = useState<Venda | null>(null);
   const [vendaParaCancelar, setVendaParaCancelar] = useState<{ id: number, justificativa?: string } | null>(null);
 
@@ -112,16 +94,21 @@ export default function Vendas() {
   const { items: vendas, isLoading, page, setPage, totalPages, isMobile } = lista;
   const filtrosAtivos = [dateRange.start, dateRange.end, statusFilter].filter(Boolean).length;
 
-  const eligible = useQuery<Paginated<VendaElegivel>>({
-    queryKey: ['fiscal-vendas-elegiveis', eligiblePage],
-    queryFn: async () => {
-      const { data } = await api.get<Paginated<VendaElegivel> | VendaElegivel[]>(
-        '/fiscal/documentos/vendas-elegiveis/',
-        { params: { page: eligiblePage } },
-      );
-      return normalizePage(data);
-    },
+  const totals = useQuery<Record<'total' | 'finalizadas' | 'em_aberto' | 'canceladas', Totals>>({
+    queryKey: ['vendas', 'totalizadores', searchTerm, statusFilter, dateRange],
+    queryFn: async () => (await api.get('/vendas/totalizadores/', { params: {
+      q: searchTerm, status: statusFilter || undefined,
+      data_inicio: dateRange.start || undefined, data_fim: dateRange.end || undefined,
+    } })).data,
   });
+  const eligible = useQuery<Paginated<VendaElegivel>>({
+    queryKey: ['fiscal-vendas-elegiveis', selectedVenda?.id],
+    enabled: selectedVenda?.status === 'FINALIZADA',
+    queryFn: async () => (await api.get('/fiscal/documentos/vendas-elegiveis/', {
+      params: { venda: selectedVenda!.id },
+    })).data,
+  });
+  const canIssue = eligible.data?.results.some(venda => venda.id === selectedVenda?.id);
 
   const emitirDocumento = useMutation({
     mutationFn: ({ venda, tipo }: { venda: number; tipo: FiscalType }) => api.post<DocumentoFiscal>(
@@ -139,6 +126,8 @@ export default function Vendas() {
       queryClient.invalidateQueries({ queryKey: ['fiscal-vendas-elegiveis'] });
       queryClient.invalidateQueries({ queryKey: ['fiscal-documentos'] });
       queryClient.invalidateQueries({ queryKey: ['fiscal-monitor'] });
+      queryClient.invalidateQueries({ queryKey: ['fiscal-totalizadores'] });
+      setIssueConfirmation(null);
     },
     onError: (error: any) => {
       const detail = error.response?.data?.detail;
@@ -146,6 +135,7 @@ export default function Vendas() {
       toast.error(detail || fieldError?.[0] || 'Não foi possível transmitir o documento fiscal.');
       queryClient.invalidateQueries({ queryKey: ['fiscal-vendas-elegiveis'] });
       queryClient.invalidateQueries({ queryKey: ['fiscal-documentos'] });
+      queryClient.invalidateQueries({ queryKey: ['fiscal-totalizadores'] });
     },
   });
 
@@ -155,6 +145,9 @@ export default function Vendas() {
     onSuccess: () => {
       toast.success('Venda cancelada com sucesso!');
       queryClient.invalidateQueries({ queryKey: ['vendas'] });
+      queryClient.invalidateQueries({ queryKey: ['fiscal-totalizadores'] });
+      queryClient.invalidateQueries({ queryKey: ['fiscal-vendas-elegiveis'] });
+      queryClient.invalidateQueries({ queryKey: ['fiscal-monitor'] });
       setSelectedVenda(null);
       setVendaParaCancelar(null);
     },
@@ -189,35 +182,13 @@ export default function Vendas() {
         <p className="page-subtitle">Gerencie e consulte todas as transações realizadas no PDV.</p>
       </div>
 
-      <div className="card" style={{ marginBottom: 24, padding: 20 }}>
-        <header style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 14 }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: '1rem' }}><ReceiptText size={18} style={{ verticalAlign: 'middle', marginRight: 7 }} />Vendas prontas para emitir</h2>
-            <small style={{ color: 'var(--text-muted)' }}>NFC-e para consumidor final; NF-e exige cliente e endereço fiscal completos.</small>
-          </div>
-          <button className="btn btn-ghost btn-sm" onClick={() => queryClient.invalidateQueries({ queryKey: ['fiscal-vendas-elegiveis'] })}>
-            <RefreshCw size={15} />Atualizar
-          </button>
-        </header>
-        {eligible.isLoading ? <div className="loading">Carregando vendas...</div> : eligible.data?.results.length ? <>
-          <div className="table-wrapper">
-            <table className="table">
-              <thead><tr><th>Venda</th><th>Cliente</th><th>Itens</th><th>Total</th><th /></tr></thead>
-              <tbody>{eligible.data.results.map((venda) => <tr key={venda.id}>
-                <td>#{venda.id}</td>
-                <td>{venda.cliente_nome || 'Consumidor final'}</td>
-                <td>{venda.itens_count}</td>
-                <td>R$ {formatCurrency(venda.total_liquido)}</td>
-                <td style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                  <button className="btn btn-primary btn-sm" disabled={emitirDocumento.isPending} onClick={() => emitirDocumento.mutate({ venda: venda.id, tipo: 'NFCE' })}><FileCheck2 size={15} />Transmitir NFC-e</button>
-                  <button className="btn btn-ghost btn-sm" disabled={emitirDocumento.isPending || !venda.cliente_nome} onClick={() => emitirDocumento.mutate({ venda: venda.id, tipo: 'NFE' })} title={!venda.cliente_nome ? 'Identifique o cliente para emitir NF-e.' : undefined}><FileText size={15} />Transmitir NF-e</button>
-                </td>
-              </tr>)}</tbody>
-            </table>
-          </div>
-          <ReadySalesPagination page={eligiblePage} count={eligible.data.count} onChange={setEligiblePage} />
-        </> : <p style={{ color: 'var(--text-muted)', margin: 0 }}>Nenhuma venda finalizada aguardando emissão.</p>}
-      </div>
+      <TotalsCards loading={totals.isLoading} error={totals.isError} items={[
+        { label: 'Todas as vendas', totals: totals.data?.total },
+        { label: 'Finalizadas', totals: totals.data?.finalizadas },
+        { label: 'Em aberto', totals: totals.data?.em_aberto },
+        { label: 'Canceladas', totals: totals.data?.canceladas },
+      ]} />
+      <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Valores líquidos de desconto, considerando todos os registros dos filtros abaixo. Canceladas não compõem o total de finalizadas.</p>
 
       {/* FILTROS */}
       <div className="card filter-card" style={{ marginBottom: 24, padding: '16px 24px' }}>
@@ -398,6 +369,17 @@ export default function Vendas() {
             </div>
 
             <div className="sale-detail-body" style={{ padding: '32px', maxHeight: '70vh', overflowY: 'auto' }}>
+               {selectedVenda.status === 'FINALIZADA' && <section style={{ marginBottom: 24 }} aria-label="Nota fiscal da venda">
+                 <h3 style={{ marginBottom: 10 }}>Nota fiscal</h3>
+                 {eligible.isLoading ? <p>Consultando situação fiscal...</p> : eligible.isError ? <p>Não foi possível consultar a emissão. <button className="btn btn-ghost btn-sm" onClick={() => eligible.refetch()}>Tentar novamente</button></p> : canIssue ? <>
+                   <p style={{ color: 'var(--text-muted)' }}>NFC-e para consumidor final; NF-e exige cliente e endereço fiscal completos.</p>
+                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                     <button className="btn btn-primary" disabled={emitirDocumento.isPending} onClick={() => setIssueConfirmation({ venda: selectedVenda.id, tipo: 'NFCE' })}><FileCheck2 size={16} />Emitir NFC-e</button>
+                     <button className="btn btn-ghost" disabled={emitirDocumento.isPending || !selectedVenda.cliente_nome} onClick={() => setIssueConfirmation({ venda: selectedVenda.id, tipo: 'NFE' })}><FileText size={16} />Emitir NF-e</button>
+                   </div>
+                 </> : <p style={{ color: 'var(--text-muted)' }}>Esta venda não está disponível para uma nova emissão. Consulte o documento e suas opções em Notas fiscais.</p>}
+                 <button className="btn btn-ghost btn-sm" onClick={() => navigate('/fiscal')}>Consultar notas fiscais</button>
+               </section>}
                <div style={{ marginBottom: 32 }}>
                   <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 16 }}>Itens da Venda</h3>
                   <div className="stack-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -493,6 +475,11 @@ export default function Vendas() {
         onClose={() => setVendaParaCancelar(null)}
         isLoading={cancelarMutation.isPending}
       />
+
+      <ConfirmModal isOpen={!!issueConfirmation} title="Confirmar emissão de nota fiscal"
+        description={`Emitir ${issueConfirmation?.tipo === 'NFE' ? 'NF-e' : 'NFC-e'} da venda #${issueConfirmation?.venda}? A transmissão será feita no ambiente fiscal configurado.`}
+        confirmLabel="Emitir nota" isDanger={false} isLoading={emitirDocumento.isPending}
+        onClose={() => setIssueConfirmation(null)} onConfirm={() => issueConfirmation && emitirDocumento.mutate(issueConfirmation)} />
 
       {/* CSS LOCAIS PARA O HISTÓRICO */}
       <style>{`

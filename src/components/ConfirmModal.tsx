@@ -1,5 +1,6 @@
 import { AlertTriangle, LoaderCircle } from 'lucide-react';
 import Modal from './Modal';
+import type { ReactNode } from 'react';
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -11,6 +12,8 @@ interface ConfirmModalProps {
   onClose: () => void;
   isDanger?: boolean;
   isLoading?: boolean;
+  children?: ReactNode;
+  confirmDisabled?: boolean;
 }
 
 export default function ConfirmModal({
@@ -23,6 +26,8 @@ export default function ConfirmModal({
   onClose,
   isDanger = true,
   isLoading = false,
+  children,
+  confirmDisabled = false,
 }: ConfirmModalProps) {
   if (!isOpen) return null;
 
@@ -56,6 +61,8 @@ export default function ConfirmModal({
         <h2 id={titleId} style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: 8 }}>{title}</h2>
         <p id={descriptionId} style={{ color: 'var(--text-secondary)', marginBottom: 28, fontSize: '0.9rem', lineHeight: 1.5 }}>{description}</p>
 
+        {children}
+
         <div style={{ display: 'flex', gap: 12 }}>
           <button data-modal-initial-focus className="btn btn-ghost" style={{ flex: 1 }} onClick={onClose} disabled={isLoading}>
             {cancelLabel}
@@ -64,7 +71,7 @@ export default function ConfirmModal({
             className={`btn ${isDanger ? 'btn-danger' : 'btn-primary'}`}
             style={{ flex: 1, justifyContent: 'center' }}
             onClick={onConfirm}
-            disabled={isLoading}
+            disabled={isLoading || confirmDisabled}
           >
             {isLoading ? <><LoaderCircle className="button-spinner" size={16} aria-hidden="true" /> Processando...</> : confirmLabel}
           </button>
