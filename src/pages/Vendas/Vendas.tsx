@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../../lib/api';
 import {
   Search,
@@ -9,7 +9,11 @@ import {
   User,
   X,
   ShoppingCart,
-  Printer
+  Printer,
+  FileCheck2,
+  FileText,
+  ReceiptText,
+  RefreshCw,
 } from 'lucide-react';
 import { cupomDaVenda } from '../../lib/cupom';
 import { imprimirCupom } from '../../lib/impressao';
@@ -52,10 +56,32 @@ interface Venda {
   pagamentos: VendaPagamento[];
 }
 
+type FiscalType = 'NFCE' | 'NFE';
+type VendaElegivel = { id: number; data: string; cliente_nome?: string; total_liquido: string; itens_count: number };
+type DocumentoFiscal = { tipo_display: string; status: string; status_display: string; mensagem_sefaz?: string };
+type Paginated<T> = { count: number; next?: string | null; previous?: string | null; results: T[] };
+
+const FISCAL_PAGE_SIZE = 50;
+const normalizePage = <T,>(data: Paginated<T> | T[]): Paginated<T> => (
+  Array.isArray(data)
+    ? { count: data.length, next: null, previous: null, results: data }
+    : data
+);
+
 const formatCurrency = (val: any) => {
   const num = Number(val);
   return isNaN(num) ? '0,00' : num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
+
+function ReadySalesPagination({ page, count, onChange }: { page: number; count: number; onChange: (page: number) => void }) {
+  const pages = Math.max(1, Math.ceil(count / FISCAL_PAGE_SIZE));
+  if (pages <= 1) return null;
+  return <div className="pagination-bar">
+    <button className="btn btn-ghost btn-sm" disabled={page <= 1} onClick={() => onChange(page - 1)}>Anterior</button>
+    <span>Página {page} de {pages} · {count} vendas</span>
+    <button className="btn btn-ghost btn-sm" disabled={page >= pages} onClick={() => onChange(page + 1)}>Próxima</button>
+  </div>;
+}
 
 export default function Vendas() {
   const queryClient = useQueryClient();
@@ -64,6 +90,7 @@ export default function Vendas() {
   const [statusFilter, setStatusFilter] = useState('');
   // Sem data por padrão: mostra todas as vendas (a API já ordena das mais recentes).
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const [eligiblePage, setEligiblePage] = useState(1);
   const [selectedVenda, setSelectedVenda] = useState<Venda | null>(null);
   const [vendaParaCancelar, setVendaParaCancelar] = useState<{ id: number, justificativa?: string } | null>(null);
 
@@ -84,6 +111,43 @@ export default function Vendas() {
   );
   const { items: vendas, isLoading, page, setPage, totalPages, isMobile } = lista;
   const filtrosAtivos = [dateRange.start, dateRange.end, statusFilter].filter(Boolean).length;
+
+  const eligible = useQuery<Paginated<VendaElegivel>>({
+    queryKey: ['fiscal-vendas-elegiveis', eligiblePage],
+    queryFn: async () => {
+      const { data } = await api.get<Paginated<VendaElegivel> | VendaElegivel[]>(
+        '/fiscal/documentos/vendas-elegiveis/',
+        { params: { page: eligiblePage } },
+      );
+      return normalizePage(data);
+    },
+  });
+
+  const emitirDocumento = useMutation({
+    mutationFn: ({ venda, tipo }: { venda: number; tipo: FiscalType }) => api.post<DocumentoFiscal>(
+      '/fiscal/documentos/emitir/',
+      { venda, tipo, canal: 'PDV' },
+    ),
+    onSuccess: ({ data }, variables) => {
+      if (data.status === 'AUTORIZADA') {
+        toast.success(`${variables.tipo === 'NFE' ? 'NF-e' : 'NFC-e'} autorizada pela SEFAZ.`);
+      } else if (data.status === 'INDEFINIDO') {
+        toast.warning(data.mensagem_sefaz || 'A comunicação terminou sem confirmação. Consulte a tela de notas fiscais.');
+      } else {
+        toast.error(data.mensagem_sefaz || `${data.tipo_display} retornou como ${data.status_display}.`);
+      }
+      queryClient.invalidateQueries({ queryKey: ['fiscal-vendas-elegiveis'] });
+      queryClient.invalidateQueries({ queryKey: ['fiscal-documentos'] });
+      queryClient.invalidateQueries({ queryKey: ['fiscal-monitor'] });
+    },
+    onError: (error: any) => {
+      const detail = error.response?.data?.detail;
+      const fieldError = error.response?.data && Object.values(error.response.data).find(value => Array.isArray(value)) as string[] | undefined;
+      toast.error(detail || fieldError?.[0] || 'Não foi possível transmitir o documento fiscal.');
+      queryClient.invalidateQueries({ queryKey: ['fiscal-vendas-elegiveis'] });
+      queryClient.invalidateQueries({ queryKey: ['fiscal-documentos'] });
+    },
+  });
 
   const cancelarMutation = useMutation({
     mutationFn: ({ id, justificativa }: { id: number, justificativa?: string }) =>
@@ -123,6 +187,36 @@ export default function Vendas() {
       <div className="page-header">
         <h1 className="page-title">Histórico de Vendas</h1>
         <p className="page-subtitle">Gerencie e consulte todas as transações realizadas no PDV.</p>
+      </div>
+
+      <div className="card" style={{ marginBottom: 24, padding: 20 }}>
+        <header style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 14 }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '1rem' }}><ReceiptText size={18} style={{ verticalAlign: 'middle', marginRight: 7 }} />Vendas prontas para emitir</h2>
+            <small style={{ color: 'var(--text-muted)' }}>NFC-e para consumidor final; NF-e exige cliente e endereço fiscal completos.</small>
+          </div>
+          <button className="btn btn-ghost btn-sm" onClick={() => queryClient.invalidateQueries({ queryKey: ['fiscal-vendas-elegiveis'] })}>
+            <RefreshCw size={15} />Atualizar
+          </button>
+        </header>
+        {eligible.isLoading ? <div className="loading">Carregando vendas...</div> : eligible.data?.results.length ? <>
+          <div className="table-wrapper">
+            <table className="table">
+              <thead><tr><th>Venda</th><th>Cliente</th><th>Itens</th><th>Total</th><th /></tr></thead>
+              <tbody>{eligible.data.results.map((venda) => <tr key={venda.id}>
+                <td>#{venda.id}</td>
+                <td>{venda.cliente_nome || 'Consumidor final'}</td>
+                <td>{venda.itens_count}</td>
+                <td>R$ {formatCurrency(venda.total_liquido)}</td>
+                <td style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                  <button className="btn btn-primary btn-sm" disabled={emitirDocumento.isPending} onClick={() => emitirDocumento.mutate({ venda: venda.id, tipo: 'NFCE' })}><FileCheck2 size={15} />Transmitir NFC-e</button>
+                  <button className="btn btn-ghost btn-sm" disabled={emitirDocumento.isPending || !venda.cliente_nome} onClick={() => emitirDocumento.mutate({ venda: venda.id, tipo: 'NFE' })} title={!venda.cliente_nome ? 'Identifique o cliente para emitir NF-e.' : undefined}><FileText size={15} />Transmitir NF-e</button>
+                </td>
+              </tr>)}</tbody>
+            </table>
+          </div>
+          <ReadySalesPagination page={eligiblePage} count={eligible.data.count} onChange={setEligiblePage} />
+        </> : <p style={{ color: 'var(--text-muted)', margin: 0 }}>Nenhuma venda finalizada aguardando emissão.</p>}
       </div>
 
       {/* FILTROS */}

@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
-import { Activity, AlertTriangle, Ban, Download, FileCheck2, FileText, PenLine, RefreshCw, Repeat2, ReceiptText, XCircle } from 'lucide-react';
+import { Activity, AlertTriangle, Ban, Download, PenLine, RefreshCw, Repeat2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '../../lib/api';
 import { useAuthStore } from '../../store/authStore';
 
 type FiscalType = 'NFCE' | 'NFE';
-type VendaElegivel = { id: number; data: string; cliente_nome?: string; total_liquido: string; itens_count: number };
 type Documento = { id: string; venda_numero: number; tipo: FiscalType; tipo_display: string; status: string; status_display: string; ambiente: string; codigo_status?: string; mensagem_sefaz?: string; numero?: string; serie?: string; chave_acesso?: string; pode_baixar_xml: boolean; pode_baixar_pdf: boolean; pode_cancelar: boolean; pode_inutilizar: boolean; prazo_cancelamento_em?: string | null; motivo_cancelamento?: string; motivo_inutilizacao?: string; created_at: string };
 type Inutilizacao = { id_externo: string; tipo_display: string; ambiente: string; status: string; status_display: string; serie: string; ano: number; numero_inicial: number; numero_final: number; mensagem_sefaz?: string; protocolo?: string; pode_baixar_xml: boolean; created_at: string };
 type ConfigFiscal = { ambiente: 'homologacao' | 'producao'; serie_nfce: string; serie_nfe: string };
@@ -24,7 +23,6 @@ const normalizePage = <T,>(data: Paginated<T> | T[]): Paginated<T> => (
     : data
 );
 
-const money = (value: string | number) => Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const errorMessage = (error: unknown, fallback: string) => {
   if (!(error instanceof AxiosError)) return fallback;
   const data = error.response?.data as ApiError | undefined;
@@ -74,7 +72,6 @@ export default function Fiscal() {
   const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
   const canManage = !user?.papel || ['ADMIN', 'GERENTE'].includes(user.papel);
-  const [eligiblePage, setEligiblePage] = useState(1);
   const [documentsPage, setDocumentsPage] = useState(1);
   const [invalidation, setInvalidation] = useState({
     tipo: 'NFCE' as FiscalType,
@@ -92,13 +89,6 @@ export default function Fiscal() {
     queryClient.invalidateQueries({ queryKey: ['fiscal-monitor'] });
     queryClient.invalidateQueries({ queryKey: ['fiscal-cartas-correcao'] });
   };
-  const eligible = useQuery<Paginated<VendaElegivel>>({
-    queryKey: ['fiscal-vendas-elegiveis', eligiblePage],
-    queryFn: async () => {
-      const { data } = await api.get<Paginated<VendaElegivel> | VendaElegivel[]>('/fiscal/documentos/vendas-elegiveis/', { params: { page: eligiblePage } });
-      return normalizePage(data);
-    },
-  });
   const documents = useQuery<Paginated<Documento>>({
     queryKey: ['fiscal-documentos', documentsPage],
     queryFn: async () => {
@@ -273,14 +263,6 @@ export default function Fiscal() {
       ].map(([label, value]) => <div key={String(label)} style={{ padding: 12, border: '1px solid var(--border)', borderRadius: 8 }}><small style={{ color: 'var(--text-muted)' }}>{label}</small><strong style={{ display: 'block', fontSize: '1.3rem' }}>{value}</strong></div>)}</div>
       {monitor.data.alertas.length ? <div style={{ display: 'grid', gap: 8 }}>{monitor.data.alertas.map((alert) => <div key={alert.codigo} style={{ padding: 10, borderRadius: 8, border: `1px solid ${alert.nivel === 'ERRO' ? '#ef4444' : alert.nivel === 'AVISO' ? '#f59e0b' : 'var(--border)'}` }}><strong>{alert.titulo}{alert.quantidade > 1 ? ` (${alert.quantidade})` : ''}</strong><small style={{ display: 'block', color: 'var(--text-muted)', marginTop: 3 }}>{alert.descricao}</small></div>)}</div> : <p style={{ color: 'var(--text-muted)', margin: 0 }}>Nenhum alerta fiscal encontrado.</p>}</>}
     </div>}
-
-    <div className="card" style={{ marginBottom: 20, padding: 20 }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 14 }}><div><h2 style={{ margin: 0, fontSize: '1rem' }}><ReceiptText size={18} style={{ verticalAlign: 'middle', marginRight: 7 }} />Vendas prontas para emitir</h2><small style={{ color: 'var(--text-muted)' }}>NFC-e para consumidor final; NF-e exige cliente e endereço fiscal completos.</small></div><button className="btn btn-ghost btn-sm" onClick={refresh}><RefreshCw size={15} />Atualizar</button></header>
-      {eligible.isLoading ? <div className="loading">Carregando vendas...</div> : eligible.data?.results.length ? <>
-        <div className="table-wrapper"><table className="table"><thead><tr><th>Venda</th><th>Cliente</th><th>Itens</th><th>Total</th><th /></tr></thead><tbody>{eligible.data.results.map((venda) => <tr key={venda.id}><td>#{venda.id}</td><td>{venda.cliente_nome || 'Consumidor final'}</td><td>{venda.itens_count}</td><td>{money(venda.total_liquido)}</td><td style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}><button className="btn btn-primary btn-sm" disabled={issue.isPending} onClick={() => issue.mutate({ venda: venda.id, tipo: 'NFCE' })}><FileCheck2 size={15} />NFC-e</button><button className="btn btn-ghost btn-sm" disabled={issue.isPending || !venda.cliente_nome} onClick={() => issue.mutate({ venda: venda.id, tipo: 'NFE' })}><FileText size={15} />NF-e</button></td></tr>)}</tbody></table></div>
-        <FiscalPagination page={eligiblePage} count={eligible.data.count} onChange={setEligiblePage} />
-      </> : <p style={{ color: 'var(--text-muted)', margin: 0 }}>Nenhuma venda finalizada aguardando emissão.</p>}
-    </div>
 
     <div className="card" style={{ padding: 20, marginBottom: 20 }}>
       <h2 style={{ margin: '0 0 14px', fontSize: '1rem' }}>Documentos recentes</h2>
