@@ -40,6 +40,18 @@ type DocumentoFiscalPdv = {
   pode_baixar_pdf: boolean;
 };
 
+type ScreenWakeLockSentinel = {
+  released: boolean;
+  release: () => Promise<void>;
+  addEventListener: (type: 'release', listener: () => void) => void;
+};
+
+type NavigatorWithWakeLock = Navigator & {
+  wakeLock?: {
+    request: (type: 'screen') => Promise<ScreenWakeLockSentinel>;
+  };
+};
+
 const FORMAS_PAGAMENTO = [
   { key: 'DINHEIRO', label: 'Dinheiro', shortcut: 'F5', icon: Banknote, color: 'var(--accent-green)' },
   { key: 'PIX', label: 'Pix', shortcut: 'F6', icon: QrCode, color: 'var(--accent)' },
@@ -124,6 +136,51 @@ export default function PDV() {
     return saved ? JSON.parse(saved) : null;
   });
   const [productAddingId, setProductAddingId] = useState<number | string | null>(null);
+
+  // Mantém o monitor ligado enquanto o terminal do PDV estiver visível.
+  // O navegador libera o bloqueio ao ocultar a página; ao retornar, pedimos
+  // novamente para que o caixa continue pronto para leitura.
+  useEffect(() => {
+    const wakeLockApi = (navigator as NavigatorWithWakeLock).wakeLock;
+    if (!wakeLockApi) return;
+
+    let disposed = false;
+    let wakeLock: ScreenWakeLockSentinel | null = null;
+
+    const requestWakeLock = async () => {
+      if (disposed || document.visibilityState !== 'visible' || (wakeLock && !wakeLock.released)) return;
+
+      try {
+        const acquiredLock = await wakeLockApi.request('screen');
+        if (disposed) {
+          void acquiredLock.release();
+          return;
+        }
+
+        wakeLock = acquiredLock;
+        acquiredLock.addEventListener('release', () => {
+          if (wakeLock === acquiredLock) wakeLock = null;
+        });
+      } catch {
+        wakeLock = null;
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') void requestWakeLock();
+    };
+
+    void requestWakeLock();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      disposed = true;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      const currentLock = wakeLock;
+      wakeLock = null;
+      if (currentLock && !currentLock.released) void currentLock.release();
+    };
+  }, []);
 
   // Operações de Caixa
   const [showCashOp, setShowCashOp] = useState(false);
