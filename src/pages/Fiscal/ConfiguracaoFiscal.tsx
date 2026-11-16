@@ -8,6 +8,7 @@ type Config = {
   ambiente: string; api_url: string; api_key_configurada: boolean;
   certificado_nome: string; certificado_configurado: boolean; certificado_senha_configurada: boolean;
   cnpj: string; inscricao_estadual: string; razao_social: string; nome_fantasia: string;
+  email_contador: string; email_remetente: string; resend_configurado: boolean;
   telefone: string; email: string; logradouro: string; numero: string; complemento: string;
   bairro: string; municipio: string; codigo_municipio: string; uf: string; cep: string;
   codigo_regime_tributario: string; tipo_atividade: string; serie_nfce: string;
@@ -19,6 +20,7 @@ const initial: Config = {
   ambiente: 'homologacao', api_url: 'https://nfe.geranet.net/api/v1', api_key_configurada: false,
   certificado_nome: '', certificado_configurado: false, certificado_senha_configurada: false,
   cnpj: '', inscricao_estadual: '', razao_social: '', nome_fantasia: '', telefone: '', email: '',
+  email_contador: '', email_remetente: 'fiscal@kaibez.com.br', resend_configurado: false,
   logradouro: '', numero: '', complemento: '', bairro: '', municipio: '', codigo_municipio: '',
   uf: '', cep: '', codigo_regime_tributario: '1', tipo_atividade: '3', serie_nfce: '1',
   proximo_numero_nfce: 1, serie_nfe: '1', proximo_numero_nfe: 1, csc_id: '', csc_configurado: false,
@@ -47,7 +49,7 @@ export default function ConfiguracaoFiscal() {
     event.preventDefault(); setSaving(true);
     const data = new FormData();
     Object.entries(form).forEach(([key, value]) => {
-      if (!key.endsWith('_configurada') && key !== 'certificado_nome') data.append(key, String(value ?? ''));
+      if (!key.endsWith('_configurada') && !key.endsWith('_configurado') && key !== 'certificado_nome') data.append(key, String(value ?? ''));
     });
     if (apiKey) data.append('api_key', apiKey);
     if (senha) data.append('certificado_senha', senha);
@@ -85,7 +87,7 @@ export default function ConfiguracaoFiscal() {
   };
 
   if (loading) return <div className="page-container">Carregando configuração fiscal...</div>;
-  const field = (label: string, key: keyof Config, extra = {}) => <div><label className="form-label">{label}</label><input className="input" value={String(form[key] ?? '')} onChange={e => set(key, e.target.value)} {...extra} /></div>;
+  const field = (label: string, key: keyof Config, extra = {}) => <div><label className="form-label" htmlFor={`fiscal-${key}`}>{label}</label><input id={`fiscal-${key}`} className="input" value={String(form[key] ?? '')} onChange={e => set(key, e.target.value)} {...extra} /></div>;
 
   return <div className="page-container animate-in">
     <div className="page-header"><div><h1 style={{display:'flex',gap:10,alignItems:'center'}}><ShieldCheck size={26}/> Configuração Fiscal</h1><p>Geranet, certificado A1 e dados do emitente.</p></div></div>
@@ -107,6 +109,13 @@ export default function ConfiguracaoFiscal() {
         <div><label className="form-label">Regime tributário</label><select className="input" value={form.codigo_regime_tributario} onChange={e=>set('codigo_regime_tributario',e.target.value)}><option value="1">Simples Nacional</option><option value="2">Simples — excesso</option><option value="3">Regime normal</option><option value="4">MEI</option></select></div>
         <div><label className="form-label">Tipo de atividade</label><select className="input" value={form.tipo_atividade} onChange={e=>set('tipo_atividade',e.target.value)}><option value="1">Comércio</option><option value="3">Comércio e serviço</option><option value="4">Indústria e comércio</option><option value="5">Indústria, comércio e serviço</option></select></div>
       </div>
+      <h2 style={{marginTop:28}}>Envio de XMLs ao contador</h2>
+      <p className="form-hint">O e-mail do contador é preenchido automaticamente no envio. O remetente deve usar um domínio verificado no Resend.</p>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:16,marginTop:16}}>
+        {field('E-mail do contador', 'email_contador', {type:'email', placeholder:'contador@escritorio.com.br'})}
+        {field('E-mail remetente', 'email_remetente', {type:'email', required:true})}
+      </div>
+      <p className="form-hint" role="status">{form.resend_configurado ? 'Resend configurado no servidor.' : 'O envio será habilitado após configurar RESEND_API_KEY no ambiente do backend.'}</p>
       <h2 style={{marginTop:28}}>Numeração e NFC-e</h2>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:16,marginTop:16}}>
         {field('Série NFC-e','serie_nfce')}{field('Próximo número NFC-e','proximo_numero_nfce',{type:'number',min:1})}{field('Série NF-e','serie_nfe')}{field('Próximo número NF-e','proximo_numero_nfe',{type:'number',min:1})}

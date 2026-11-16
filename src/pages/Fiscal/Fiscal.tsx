@@ -2,17 +2,18 @@ import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
-import { Activity, AlertTriangle, Ban, Download, PenLine, RefreshCw, Repeat2, Search, XCircle } from 'lucide-react';
+import { Activity, AlertTriangle, Ban, Download, Mail, PenLine, RefreshCw, Repeat2, Search, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '../../lib/api';
 import ConfirmModal from '../../components/ConfirmModal';
+import EnviarXmlContadorModal from './EnviarXmlContadorModal';
 import TotalsCards, { type Totals } from '../../components/TotalsCards';
 import { useAuthStore } from '../../store/authStore';
 
 type FiscalType = 'NFCE' | 'NFE';
 type Documento = { id: string; venda_numero: number; tipo: FiscalType; tipo_display: string; status: string; status_display: string; ambiente: string; codigo_status?: string; mensagem_sefaz?: string; numero?: string; serie?: string; chave_acesso?: string; pode_baixar_xml: boolean; pode_baixar_pdf: boolean; pode_cancelar: boolean; pode_inutilizar: boolean; prazo_cancelamento_em?: string | null; motivo_cancelamento?: string; motivo_inutilizacao?: string; created_at: string };
 type Inutilizacao = { id_externo: string; tipo_display: string; ambiente: string; status: string; status_display: string; serie: string; ano: number; numero_inicial: number; numero_final: number; mensagem_sefaz?: string; protocolo?: string; pode_baixar_xml: boolean; created_at: string };
-type ConfigFiscal = { ambiente: 'homologacao' | 'producao'; serie_nfce: string; serie_nfe: string };
+type ConfigFiscal = { ambiente: 'homologacao' | 'producao'; serie_nfce: string; serie_nfe: string; email_contador: string; email_remetente: string; resend_configurado: boolean };
 type FiscalAlert = { nivel: 'ERRO' | 'AVISO' | 'INFO'; codigo: string; titulo: string; descricao: string; quantidade: number };
 type FiscalMonitor = { ambiente: string; certificado: { status: string; valido_ate?: string | null; dias_restantes?: number | null; mensagem: string }; resumo: { autorizadas: number; canceladas: number; rejeitadas: number; indefinidas: number; erros: number; processando_atrasadas: number; vendas_sem_documento: number }; contingencia: { suportada: boolean; motivo: string }; alertas: FiscalAlert[] };
 type CartaCorrecao = { id_externo: string; documento: string; documento_numero: string; documento_serie: string; sequencia: number; texto_correcao: string; status: string; status_display: string; mensagem_sefaz?: string; protocolo?: string; pode_baixar_xml: boolean; created_at: string };
@@ -97,6 +98,7 @@ export default function Fiscal() {
   }, { preventScrollReset: true, replace: key === 'q' });
   const setDocumentsPage = (page: number) => setDocumentFilter('pagina', String(page));
   const [action, setAction] = useState<FiscalAction | null>(null);
+  const [showSendXml, setShowSendXml] = useState(false);
   const [reason, setReason] = useState('');
   const openAction = (next: FiscalAction) => { setReason(''); setAction(next); };
   const [invalidation, setInvalidation] = useState({
@@ -277,7 +279,10 @@ export default function Fiscal() {
   const environment = config.data?.ambiente;
   const monitorAlerts = monitor.data?.alertas.filter(alert => !HIDDEN_MONITOR_ALERTS.has(alert.codigo)) || [];
   return <div className="animate-in">
-    <div className="page-header"><h1 className="page-title">Notas fiscais</h1><p className="page-subtitle">Emissão, reenvio, cancelamento e inutilização de NF-e e NFC-e pela Geranet.</p></div>
+    <div className="page-header page-header-row">
+      <div><h1 className="page-title">Notas fiscais</h1><p className="page-subtitle">Emissão, reenvio, cancelamento e inutilização de NF-e e NFC-e pela Geranet.</p></div>
+      {canManage && <button className="btn btn-primary" disabled={!config.data} onClick={() => setShowSendXml(true)}><Mail size={17} />Enviar XMLs ao contador</button>}
+    </div>
 
     <TotalsCards loading={totals.isLoading} error={totals.isError} items={[
       { label: 'Transmitidas · autorizadas', totals: totals.data?.transmitidas },
@@ -376,5 +381,6 @@ export default function Fiscal() {
         <textarea id="fiscal-action-reason" className="input" rows={4} maxLength={action?.kind === 'correct' ? 1000 : 255} value={reason} disabled={actionBusy} onChange={event => setReason(event.target.value)} />
       </div>}
     </ConfirmModal>
+    {showSendXml && config.data && <EnviarXmlContadorModal config={config.data} onClose={() => setShowSendXml(false)} />}
   </div>;
 }

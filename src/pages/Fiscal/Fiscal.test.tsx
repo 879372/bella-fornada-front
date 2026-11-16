@@ -24,7 +24,7 @@ describe('Confirmações fiscais', () => {
   beforeEach(() => {
     get.mockReset(); post.mockReset();
     get.mockImplementation(async (url: string) => {
-      if (url === '/fiscal/configuracao/') return { data: { ambiente: 'producao', serie_nfce: '1' } };
+      if (url === '/fiscal/configuracao/') return { data: { ambiente: 'producao', serie_nfce: '1', email_contador: 'contador@example.com', email_remetente: 'fiscal@kaibez.com.br', resend_configurado: true } };
       if (url === '/fiscal/documentos/') return { data: { count: 1, results: [document] } };
       if (url === '/fiscal/documentos/totalizadores/') return { data: { ambiente: 'producao', transmitidas: { quantidade: 2, valor: '30.00' }, pendentes: { quantidade: 1, valor: '15.00' } } };
       if (url === '/fiscal/monitor/') return { data: { certificado: { mensagem: 'Válido' }, resumo: {}, alertas: [
@@ -98,6 +98,16 @@ describe('Confirmações fiscais', () => {
     await waitFor(() => expect(get).toHaveBeenCalledWith('/fiscal/documentos/', { params: { page: 1, venda: '7', status: 'REJEITADA', q: key } }));
     fireEvent.change(search, { target: { value: '' } });
     await waitFor(() => expect(get).toHaveBeenCalledWith('/fiscal/documentos/', { params: { page: 1, venda: '7', status: 'REJEITADA', q: undefined } }));
+  });
+
+  it('abre a opção de envio ao contador com o e-mail configurado, sem envio automático', async () => {
+    const user = userEvent.setup(); mount();
+    const button = await screen.findByRole('button', { name: 'Enviar XMLs ao contador' });
+    await waitFor(() => expect(button).toBeEnabled());
+    await user.click(button);
+    expect(screen.getByRole('dialog', { name: 'Enviar XMLs ao contador' })).toBeInTheDocument();
+    expect(screen.getByLabelText('E-mail do contador')).toHaveValue('contador@example.com');
+    expect(post).not.toHaveBeenCalled();
   });
 
 });
