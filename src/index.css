@@ -1654,6 +1654,32 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .production-tabs button.active { background: var(--accent); color: white; box-shadow: 0 4px 10px rgba(99, 57, 45, .22); }
 .production-empty { min-height: 280px; padding: 36px 24px; }.production-empty svg { color: var(--accent); }.production-empty h3 { color: var(--text-primary); }.production-empty p { max-width: 480px; margin-bottom: 10px; }
 .filter-card { margin-bottom: 20px; }
+.sales-filters { padding: 22px; margin-bottom: 20px; }
+.sales-filters-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.sales-filters-title { display: flex; align-items: center; gap: 12px; }
+.sales-filters-icon { display: grid; place-items: center; width: 42px; height: 42px; flex-shrink: 0; border-radius: 12px; background: var(--bg-secondary); color: var(--accent); }
+.sales-filters-title h2 { margin: 0; font-size: 1rem; }
+.sales-filters-title p { margin: 4px 0 0; font-size: .8rem; color: var(--text-muted); }
+.sales-filters-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.sales-filters-grid { display: grid; grid-template-columns: minmax(220px, 1.6fr) repeat(3, minmax(140px, 1fr)); gap: 16px; align-items: end; }
+.sales-filters-grid > div { min-width: 0; }
+.sales-filters-grid .form-label { text-transform: none; font-size: .8rem; letter-spacing: 0; margin-bottom: 8px; }
+.sales-filters-grid .input { min-height: 46px; width: 100%; border-radius: 10px; }
+.sales-filters-grid .search-input-wrapper { margin: 0; }
+.sales-summary-note { color: var(--text-muted); font-size: .8rem; margin: -6px 0 20px; }
+@media (max-width: 1100px) {
+  .sales-filters-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .sales-filters { padding: 16px; }
+  .sales-filters-header { align-items: stretch; flex-direction: column; }
+  .sales-filters-actions .btn { flex: 1; justify-content: center; }
+  .sales-filter-search, .sales-filters-grid > div:last-child { grid-column: 1 / -1; }
+  .sales-filters-grid { gap: 12px; }
+}
+@media (max-width: 380px) {
+  .sales-filters-grid { grid-template-columns: minmax(0, 1fr); }
+}
 .filters-grid { display: grid; grid-template-columns: minmax(240px, 2fr) 1fr 1fr auto; align-items: end; gap: 14px; }
 .compact-kpis { grid-template-columns: repeat(2, minmax(220px, 320px)); }
 .finance-kpis { grid-template-columns: repeat(4, minmax(180px, 1fr)); }

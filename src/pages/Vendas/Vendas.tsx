@@ -5,7 +5,9 @@ import {
   Search,
   Eye,
   Trash2,
-  Clock,
+  RefreshCw,
+  SlidersHorizontal,
+  RotateCcw,
   User,
   X,
   ShoppingCart,
@@ -20,7 +22,6 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import ConfirmModal from '../../components/ConfirmModal';
 import Modal from '../../components/Modal';
 import TotalsCards, { type Totals } from '../../components/TotalsCards';
-import FilterPanel from '../../components/FilterPanel';
 import InfiniteScroll from '../../components/InfiniteScroll';
 import { usePaginatedList } from '../../hooks/usePaginatedList';
 
@@ -92,30 +93,28 @@ export default function Vendas() {
   };
   const [vendaParaCancelar, setVendaParaCancelar] = useState<{ id: number, justificativa?: string } | null>(null);
 
+  const filterParams = {
+    q: searchTerm,
+    status: statusFilter || undefined,
+    data_inicio: dateRange.start || undefined,
+    data_fim: dateRange.end || undefined,
+  };
+
   const lista = usePaginatedList<Venda>(
     ['vendas', searchTerm, statusFilter, dateRange],
     async (page) => {
       const resp = await api.get('/vendas/', {
-        params: {
-          q: searchTerm,
-          status: statusFilter || undefined,
-          data_inicio: dateRange.start || undefined,
-          data_fim: dateRange.end || undefined,
-          page
-        }
+        params: { ...filterParams, page }
       });
       return resp.data;
     }
   );
   const { items: vendas, isLoading, page, setPage, totalPages, isMobile } = lista;
-  const filtrosAtivos = [dateRange.start, dateRange.end, statusFilter].filter(Boolean).length;
+  const filtrosAtivos = [searchTerm, dateRange.start, dateRange.end, statusFilter].filter(Boolean).length;
 
   const totals = useQuery<Record<'total' | 'finalizadas' | 'em_aberto' | 'canceladas', Totals>>({
     queryKey: ['vendas', 'totalizadores', searchTerm, statusFilter, dateRange],
-    queryFn: async () => (await api.get('/vendas/totalizadores/', { params: {
-      q: searchTerm, status: statusFilter || undefined,
-      data_inicio: dateRange.start || undefined, data_fim: dateRange.end || undefined,
-    } })).data,
+    queryFn: async () => (await api.get('/vendas/totalizadores/', { params: filterParams })).data,
   });
   const eligible = useQuery<Paginated<VendaElegivel>>({
     queryKey: ['fiscal-vendas-elegiveis', selectedVenda?.id],
@@ -198,81 +197,51 @@ export default function Vendas() {
         <p className="page-subtitle">Gerencie e consulte todas as transações realizadas no PDV.</p>
       </div>
 
-      <TotalsCards loading={totals.isLoading} error={totals.isError} items={[
-        { label: 'Todas as vendas', totals: totals.data?.total },
+      <section className="card sales-filters" aria-labelledby="sales-filters-title">
+        <header className="sales-filters-header">
+          <div className="sales-filters-title">
+            <span className="sales-filters-icon"><SlidersHorizontal size={20} aria-hidden="true" /></span>
+            <div><h2 id="sales-filters-title">Filtrar vendas</h2><p>{filtrosAtivos ? `${filtrosAtivos} filtro(s) ativo(s)` : 'Consulte por cliente, venda, período ou status'}</p></div>
+          </div>
+          <div className="sales-filters-actions">
+            <button className="btn btn-ghost btn-sm" disabled={!filtrosAtivos} onClick={() => { setSearchTerm(''); setStatusFilter(''); setDateRange({ start: '', end: '' }); setPage(1); }}><RotateCcw size={15} />Limpar filtros</button>
+            <button className="btn btn-primary btn-sm" disabled={totals.isFetching} onClick={() => queryClient.invalidateQueries({ queryKey: ['vendas'] })}><RefreshCw size={15} className={totals.isFetching ? 'button-spinner' : undefined} />Atualizar</button>
+          </div>
+        </header>
+        <div className="sales-filters-grid">
+          <div className="sales-filter-search">
+            <label className="form-label" htmlFor="sales-search">Cliente ou número da venda</label>
+            <div className="search-input-wrapper">
+              <Search className="search-icon" size={18} aria-hidden="true" />
+              <input id="sales-search" type="search" className="input" placeholder="Nome do cliente ou # da venda" value={searchTerm} onChange={e => { setSearchTerm(e.target.value); setPage(1); }} />
+            </div>
+          </div>
+          <div><label className="form-label" htmlFor="sales-date-start">Data inicial</label>
+            <input id="sales-date-start" type="date" className="input" value={dateRange.start} onChange={e => { setDateRange(prev => ({ ...prev, start: e.target.value })); setPage(1); }} />
+          </div>
+          <div><label className="form-label" htmlFor="sales-date-end">Data final</label>
+            <input id="sales-date-end" type="date" className="input" value={dateRange.end} onChange={e => { setDateRange(prev => ({ ...prev, end: e.target.value })); setPage(1); }} />
+          </div>
+          <div><label className="form-label" htmlFor="sales-status">Status da venda</label>
+            <select id="sales-status" className="input" value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }}>
+              <option value="">Todos os status</option><option value="FINALIZADA">Finalizadas</option><option value="CANCELADA">Canceladas</option><option value="EM_ABERTO">Em aberto</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <TotalsCards loading={totals.isFetching} error={totals.isError} items={[
+        { label: 'Vendas encontradas', totals: totals.data?.total },
         { label: 'Finalizadas', totals: totals.data?.finalizadas },
         { label: 'Em aberto', totals: totals.data?.em_aberto },
         { label: 'Canceladas', totals: totals.data?.canceladas },
       ]} />
-      <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Valores líquidos de desconto, considerando todos os registros dos filtros abaixo. Canceladas não compõem o total de finalizadas.</p>
+      <p className="sales-summary-note">Quantidades e valores líquidos de desconto de todas as páginas, conforme os filtros selecionados. Canceladas não compõem o total de finalizadas.</p>
 
       {saleId && (saleDetails.isLoading || saleDetails.isError || !validSaleId) && <div className="card" style={{ padding: 16, marginBottom: 20 }} role="status">
         {saleDetails.isLoading ? 'Carregando detalhes da venda...' : 'Não foi possível abrir esta venda. Ela pode estar indisponível ou você não possui acesso.'}
         {!saleDetails.isLoading && <button className="btn btn-ghost btn-sm" onClick={() => setSelectedVenda(null)}>Voltar ao histórico</button>}
       </div>}
-
-      {/* FILTROS */}
-      <div className="card filter-card" style={{ marginBottom: 24, padding: '16px 24px' }}>
-        <div className="responsive-toolbar-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 1.5fr) 1fr 1fr 1fr auto', gap: 12, alignItems: 'end' }}>
-          <FilterPanel
-            ativos={filtrosAtivos}
-            search={
-              <div>
-                <label className="form-label" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>CLIENTE / ID</label>
-                <div className="search-input-wrapper" style={{ margin: 0 }}>
-                  <Search className="search-icon" size={18} />
-                  <input
-                    type="search"
-                    className="input"
-                    placeholder="Buscar venda..."
-                    value={searchTerm}
-                    onChange={e => { setSearchTerm(e.target.value); setPage(1); }}
-                  />
-                </div>
-              </div>
-            }
-          >
-            <div>
-              <label className="form-label" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>DATA INICIAL</label>
-              <input
-                type="date"
-                className="input"
-                value={dateRange.start}
-                onChange={e => { setDateRange(prev => ({ ...prev, start: e.target.value })); setPage(1); }}
-              />
-            </div>
-
-            <div>
-              <label className="form-label" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>DATA FINAL</label>
-              <input
-                type="date"
-                className="input"
-                value={dateRange.end}
-                onChange={e => { setDateRange(prev => ({ ...prev, end: e.target.value })); setPage(1); }}
-              />
-            </div>
-
-            <div>
-              <label className="form-label" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>STATUS</label>
-              <select
-                className="select"
-                value={statusFilter}
-                onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
-              >
-                <option value="">Todos</option>
-                <option value="FINALIZADA">Finalizadas</option>
-                <option value="CANCELADA">Canceladas</option>
-                <option value="EM_ABERTO">Em Aberto</option>
-              </select>
-            </div>
-
-            <button className="btn btn-ghost" onClick={() => queryClient.invalidateQueries({ queryKey: ['vendas'] })} style={{ height: 42 }}>
-              <Clock size={18} />
-              Atualizar
-            </button>
-          </FilterPanel>
-        </div>
-      </div>
 
       {/* LISTA (mobile) */}
       {isMobile ? (
