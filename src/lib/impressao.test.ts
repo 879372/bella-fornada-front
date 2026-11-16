@@ -32,7 +32,9 @@ describe('montarCupomHtml', () => {
     expect(html).toContain('<span>Dinheiro</span><span>R$ 20,00</span>');
     expect(html).toContain('<span>TROCO R$.:</span><span>R$ 15,00</span>');
     expect(html).toContain('CLIENTE.: AVULSO');
-    expect(html).toContain('size: 80mm auto');
+    expect(html).toContain('@page { size: auto; margin: 0; }');
+    expect(html).toContain('margin: 0 auto;');
+    expect(html).toContain('max-width: calc(100% - 8mm);');
   });
 
   it('escapa nomes vindos do cadastro', () => {

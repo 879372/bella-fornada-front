@@ -1,7 +1,8 @@
 /**
  * Impressão do cupom pelo PDV: monta o DAV em HTML de 80mm e imprime pelo
  * driver da impressora instalado no Windows. Com o Chrome aberto pelo atalho
- * com --kiosk-printing, vai direto para a impressora padrão, sem abrir janela.
+ * com --kiosk-printing, confirma automaticamente a impressão. A prévia nativa
+ * do Chrome ainda pode aparecer brevemente, conforme a configuração do caixa.
  */
 import { CupomDados, FORMAS, LOJA, moeda } from './cupom';
 
@@ -56,13 +57,16 @@ export function montarCupomHtml(dados: CupomDados): string {
 <meta charset="utf-8">
 <title>Cupom ${escapar(dados.numero)}</title>
 <style>
-  @page { size: 80mm auto; margin: 0; }
+  /* A largura física é definida pela bobina configurada no driver. */
+  @page { size: auto; margin: 0; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: #fff; color: #000; }
   /* Negrito: o driver imprime o cupom como imagem e traços finos saem
      claros/falhados no papel térmico. */
   body {
-    width: 68mm;
+    width: 72mm;
+    max-width: calc(100% - 8mm);
+    margin: 0 auto;
     padding: 2mm 2mm 6mm;
     font-family: Arial, Helvetica, sans-serif;
     font-size: 9px;
@@ -78,8 +82,10 @@ export function montarCupomHtml(dados: CupomDados): string {
   .sep { border-top: 1px dashed #000; margin: 4px 0; }
   .sep, .sep-strong { width: 100%; }
   .sep-strong { border-top: 2px solid #000; margin: 4px 0; }
-  .row { display: flex; justify-content: space-between; gap: 8px; }
-  .cols { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; padding-left: 6mm; text-align: right; }
+  .row { display: flex; justify-content: space-between; align-items: baseline; gap: 2mm; flex-wrap: wrap; }
+  .row > span { max-width: 100%; overflow-wrap: anywhere; }
+  .cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1mm; text-align: right; }
+  .cols span { min-width: 0; overflow-wrap: anywhere; }
   .cols span:first-child { text-align: left; }
   .item { word-break: break-word; }
   .right { text-align: right; }
@@ -118,8 +124,8 @@ export function montarCupomHtml(dados: CupomDados): string {
 }
 
 /**
- * Imprime o HTML num iframe oculto, sem trocar de página. O diálogo de
- * impressão só não aparece quando o Chrome é aberto com --kiosk-printing.
+ * Imprime num frame fora da tela, sem trocar de página. A interface nativa de
+ * impressão é controlada pelo Chrome e pelo driver, não pelo CSS do site.
  */
 function imprimirPeloSistema(conteudo: { html: string } | { pdf: Blob }) {
   return new Promise<void>((resolve, reject) => {
