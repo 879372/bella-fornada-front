@@ -41,10 +41,10 @@ type DocumentoFiscalPdv = {
 };
 
 const FORMAS_PAGAMENTO = [
-  { key: 'DINHEIRO', label: 'Dinheiro', icon: Banknote, color: 'var(--accent-green)' },
-  { key: 'PIX', label: 'Pix', icon: QrCode, color: 'var(--accent)' },
-  { key: 'CARTAO_DEBITO', label: 'Débito', icon: CreditCard, color: 'var(--accent-yellow)' },
-  { key: 'CARTAO_CREDITO', label: 'Crédito', icon: CreditCard, color: 'var(--accent-yellow)' },
+  { key: 'DINHEIRO', label: 'Dinheiro', shortcut: 'F5', icon: Banknote, color: 'var(--accent-green)' },
+  { key: 'PIX', label: 'Pix', shortcut: 'F6', icon: QrCode, color: 'var(--accent)' },
+  { key: 'CARTAO_DEBITO', label: 'Débito', shortcut: 'F7', icon: CreditCard, color: 'var(--accent-yellow)' },
+  { key: 'CARTAO_CREDITO', label: 'Crédito', shortcut: 'F8', icon: CreditCard, color: 'var(--accent-yellow)' },
 ];
 
 // Exportado somente para os testes unitários dos cálculos monetários.
@@ -702,15 +702,24 @@ export default function PDV() {
     showPrintModal,
   ]);
 
-  // F4 no pagamento: concluir venda
+  // Atalhos do pagamento: F4 conclui e F5–F8 selecionam a forma.
   const concluirVendaRef = useRef(concluirVenda);
   concluirVendaRef.current = concluirVenda;
   useEffect(() => {
     if (!showPagamento) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key !== 'F4' || e.repeat) return;
+      if (e.repeat) return;
+      if (e.key === 'F4') {
+        e.preventDefault();
+        concluirVendaRef.current();
+        return;
+      }
+
+      const forma = FORMAS_PAGAMENTO.find(item => item.shortcut === e.key);
+      if (!forma) return;
       e.preventDefault();
-      concluirVendaRef.current();
+      setFormaPagto(forma.key);
+      valorPagoRef.current?.focus();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -1134,10 +1143,13 @@ export default function PDV() {
                              type="button"
                              className="payment-method-button"
                              aria-pressed={formaPagto === f.key}
+                             aria-keyshortcuts={f.shortcut}
+                             title={`${f.label} (${f.shortcut})`}
                              onClick={() => setFormaPagto(f.key)}
                             >
                              <f.icon size={22} />
-                             {f.label}
+                             <span>{f.label}</span>
+                             <kbd className="pdv-payment-shortcut" aria-hidden="true">{f.shortcut}</kbd>
                            </button>
                          ))}
                       </div>

@@ -1460,6 +1460,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .pdv-payment-methods .payment-method-button {
+  position: relative;
   min-height: 62px;
   display: flex;
   align-items: center;
@@ -1475,10 +1476,33 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   font-weight: 800;
 }
 
+.pdv-payment-shortcut {
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  min-width: 28px;
+  padding: 2px 5px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg-primary);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  box-shadow: none;
+}
+
 .pdv-payment-methods .payment-method-button[aria-pressed="true"] {
   border-color: var(--accent);
   background: rgba(59, 130, 246, 0.1);
   color: var(--accent);
+}
+
+.pdv-payment-methods .payment-method-button[aria-pressed="true"] .pdv-payment-shortcut {
+  border-color: currentColor;
+  color: currentColor;
 }
 
 .pdv-payment-value-row {
