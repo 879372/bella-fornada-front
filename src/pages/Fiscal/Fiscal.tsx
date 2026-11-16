@@ -8,7 +8,7 @@ import { useAuthStore } from '../../store/authStore';
 
 type FiscalType = 'NFCE' | 'NFE';
 type VendaElegivel = { id: number; data: string; cliente_nome?: string; total_liquido: string; itens_count: number };
-type Documento = { id: string; venda_numero: number; tipo: FiscalType; tipo_display: string; status: string; status_display: string; ambiente: string; codigo_status?: string; mensagem_sefaz?: string; numero?: string; serie?: string; chave_acesso?: string; pode_baixar_xml: boolean; pode_baixar_pdf: boolean; pode_cancelar: boolean; prazo_cancelamento_em?: string | null; motivo_cancelamento?: string };
+type Documento = { id: string; venda_numero: number; tipo: FiscalType; tipo_display: string; status: string; status_display: string; ambiente: string; codigo_status?: string; mensagem_sefaz?: string; numero?: string; serie?: string; chave_acesso?: string; pode_baixar_xml: boolean; pode_baixar_pdf: boolean; pode_cancelar: boolean; pode_inutilizar: boolean; prazo_cancelamento_em?: string | null; motivo_cancelamento?: string; motivo_inutilizacao?: string; created_at: string };
 type Inutilizacao = { id_externo: string; tipo_display: string; ambiente: string; status: string; status_display: string; serie: string; ano: number; numero_inicial: number; numero_final: number; mensagem_sefaz?: string; protocolo?: string; pode_baixar_xml: boolean; created_at: string };
 type ConfigFiscal = { ambiente: 'homologacao' | 'producao'; serie_nfce: string; serie_nfe: string };
 type FiscalAlert = { nivel: 'ERRO' | 'AVISO' | 'INFO'; codigo: string; titulo: string; descricao: string; quantidade: number };
@@ -131,6 +131,7 @@ export default function Fiscal() {
     mutationFn: ({ venda, tipo }: { venda: number; tipo: FiscalType }) => api.post<Documento>('/fiscal/documentos/emitir/', { venda, tipo, canal: 'PDV' }),
     onSuccess: ({ data }, variables) => {
       if (data.status === 'AUTORIZADA') toast.success(`${variables.tipo === 'NFE' ? 'NF-e' : 'NFC-e'} autorizada pela SEFAZ.`);
+      else if (data.status === 'INDEFINIDO') toast.warning(data.mensagem_sefaz || 'A comunicação terminou sem confirmação. Reprocesse o mesmo documento.');
       else toast.error(data.mensagem_sefaz || `${data.tipo_display} retornou como ${data.status_display}.`);
       refresh();
     },
@@ -174,6 +175,24 @@ export default function Fiscal() {
     const resolution = rejectionResolution(document);
     if (!window.confirm(`${resolution.confirmation}\n\nDocumento: ${document.tipo_display} nº ${document.numero || '—'}, série ${document.serie || '—'}.`)) return;
     issue.mutate({ venda: document.venda_numero, tipo: document.tipo });
+  };
+  const prepareInvalidation = (document: Documento) => {
+    if (!document.pode_inutilizar || !document.numero || !document.serie) {
+      toast.error(document.motivo_inutilizacao || 'Esta numeração não pode ser inutilizada.');
+      return;
+    }
+    setInvalidation({
+      tipo: document.tipo,
+      serie: document.serie,
+      ano: String(new Date(document.created_at).getFullYear()),
+      numeroInicial: document.numero,
+      numeroFinal: document.numero,
+      justificativa: 'Numeração rejeitada sem autorização de uso pela SEFAZ.',
+    });
+    window.requestAnimationFrame(() => {
+      window.document.getElementById('fiscal-invalidation')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    toast.info('Numeração preenchida. Confira os dados e confirme a inutilização.');
   };
   const download = async (document: Documento, format: 'xml' | 'pdf') => {
     try {
@@ -274,12 +293,13 @@ export default function Fiscal() {
             <td>
               <span className={`badge ${document.status === 'AUTORIZADA' ? 'badge-green' : document.status === 'INDEFINIDO' ? 'badge-yellow' : ['REJEITADA', 'ERRO'].includes(document.status) ? 'badge-red' : 'badge-yellow'}`}>{document.status_display}</span>
               {document.mensagem_sefaz && <small style={{ display: 'block', color: 'var(--text-muted)', maxWidth: 640 }}>{document.mensagem_sefaz}</small>}
-              {document.status === 'REJEITADA' && <small style={{ display: 'flex', gap: 5, alignItems: 'center', color: 'var(--accent-yellow)', marginTop: 5 }}><AlertTriangle size={13} />{resolution.guidance}</small>}
+              {['REJEITADA', 'INDEFINIDO'].includes(document.status) && <small style={{ display: 'flex', gap: 5, alignItems: 'center', color: 'var(--accent-yellow)', marginTop: 5 }}><AlertTriangle size={13} />{resolution.guidance}</small>}
               {document.status === 'AUTORIZADA' && !document.pode_cancelar && <small style={{ display: 'block', color: '#ef4444' }}>{document.motivo_cancelamento}</small>}
             </td>
             <td>{document.ambiente}</td>
             <td style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-              {document.status === 'REJEITADA' && <button className="btn btn-primary btn-sm" disabled={issue.isPending} onClick={() => resolveDocument(document)}><Repeat2 size={14} />{resolution.label}</button>}
+              {['REJEITADA', 'INDEFINIDO'].includes(document.status) && <button className="btn btn-primary btn-sm" disabled={issue.isPending} onClick={() => resolveDocument(document)}><Repeat2 size={14} />{resolution.label}</button>}
+              {canManage && document.pode_inutilizar && <button className="btn btn-danger btn-sm" disabled={invalidateNumbers.isPending} onClick={() => prepareInvalidation(document)} title={document.motivo_inutilizacao}><Ban size={14} />Inutilizar</button>}
               {document.pode_baixar_xml && <button className="btn btn-ghost btn-sm" onClick={() => download(document, 'xml')}><Download size={14} />XML</button>}
               {document.pode_baixar_pdf && <button className="btn btn-ghost btn-sm" onClick={() => download(document, 'pdf')}><Download size={14} />PDF</button>}
               {canManage && document.tipo === 'NFE' && document.status === 'AUTORIZADA' && <button className="btn btn-ghost btn-sm" disabled={correct.isPending} onClick={() => correctDocument(document)}><PenLine size={14} />CC-e</button>}
@@ -293,7 +313,7 @@ export default function Fiscal() {
 
     {canManage && correctionLetters.data?.length ? <div className="card" style={{ padding: 20, marginBottom: 20 }}><h2 style={{ margin: '0 0 14px', fontSize: '1rem' }}>Cartas de Correção</h2><div className="table-wrapper"><table className="table"><thead><tr><th>NF-e</th><th>Sequência</th><th>Correção</th><th>Status</th><th>Protocolo</th><th /></tr></thead><tbody>{correctionLetters.data.map((record) => <tr key={record.id_externo}><td>Nº {record.documento_numero} · Série {record.documento_serie}</td><td>{record.sequencia}</td><td>{record.texto_correcao}</td><td><span className={`badge ${record.status === 'REGISTRADA' ? 'badge-green' : 'badge-red'}`}>{record.status_display}</span>{record.mensagem_sefaz && <small style={{ display: 'block', color: 'var(--text-muted)' }}>{record.mensagem_sefaz}</small>}</td><td>{record.protocolo || '—'}</td><td>{record.pode_baixar_xml && <button className="btn btn-ghost btn-sm" onClick={() => downloadCorrectionXml(record)}><Download size={14} />XML</button>}</td></tr>)}</tbody></table></div></div> : null}
 
-    {canManage && <div className="card" style={{ padding: 20 }}>
+    {canManage && <div id="fiscal-invalidation" className="card" style={{ padding: 20, scrollMarginTop: 20 }}>
       <h2 style={{ margin: '0 0 6px', fontSize: '1rem' }}><Ban size={18} style={{ verticalAlign: 'middle', marginRight: 7 }} />Inutilizar numeração</h2>
       <p style={{ color: 'var(--text-muted)', margin: '0 0 16px' }}>Use somente para números que não foram autorizados nem usados em outro sistema. A operação é registrada e não pode ser desfeita.</p>
       <div className="form-grid">
