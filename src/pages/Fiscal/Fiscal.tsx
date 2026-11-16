@@ -1,20 +1,28 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
-import { Activity, Ban, Download, FileCheck2, FileText, PenLine, RefreshCw, Repeat2, ReceiptText, XCircle } from 'lucide-react';
+import { Activity, AlertTriangle, Ban, Download, FileCheck2, FileText, PenLine, RefreshCw, Repeat2, ReceiptText, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '../../lib/api';
 import { useAuthStore } from '../../store/authStore';
 
 type FiscalType = 'NFCE' | 'NFE';
 type VendaElegivel = { id: number; data: string; cliente_nome?: string; total_liquido: string; itens_count: number };
-type Documento = { id: string; venda_numero: number; tipo: FiscalType; tipo_display: string; status: string; status_display: string; ambiente: string; mensagem_sefaz?: string; numero?: string; serie?: string; chave_acesso?: string; pode_baixar_xml: boolean; pode_baixar_pdf: boolean; pode_cancelar: boolean; prazo_cancelamento_em?: string | null; motivo_cancelamento?: string };
+type Documento = { id: string; venda_numero: number; tipo: FiscalType; tipo_display: string; status: string; status_display: string; ambiente: string; codigo_status?: string; mensagem_sefaz?: string; numero?: string; serie?: string; chave_acesso?: string; pode_baixar_xml: boolean; pode_baixar_pdf: boolean; pode_cancelar: boolean; prazo_cancelamento_em?: string | null; motivo_cancelamento?: string };
 type Inutilizacao = { id_externo: string; tipo_display: string; ambiente: string; status: string; status_display: string; serie: string; ano: number; numero_inicial: number; numero_final: number; mensagem_sefaz?: string; protocolo?: string; pode_baixar_xml: boolean; created_at: string };
 type ConfigFiscal = { ambiente: 'homologacao' | 'producao'; serie_nfce: string; serie_nfe: string };
 type FiscalAlert = { nivel: 'ERRO' | 'AVISO' | 'INFO'; codigo: string; titulo: string; descricao: string; quantidade: number };
 type FiscalMonitor = { ambiente: string; certificado: { status: string; valido_ate?: string | null; dias_restantes?: number | null; mensagem: string }; resumo: { autorizadas: number; canceladas: number; rejeitadas: number; indefinidas: number; erros: number; processando_atrasadas: number; vendas_sem_documento: number }; contingencia: { suportada: boolean; motivo: string }; alertas: FiscalAlert[] };
 type CartaCorrecao = { id_externo: string; documento: string; documento_numero: string; documento_serie: string; sequencia: number; texto_correcao: string; status: string; status_display: string; mensagem_sefaz?: string; protocolo?: string; pode_baixar_xml: boolean; created_at: string };
 type ApiError = { detail?: string; [key: string]: unknown };
+type Paginated<T> = { count: number; next?: string | null; previous?: string | null; results: T[] };
+
+const PAGE_SIZE = 50;
+const normalizePage = <T,>(data: Paginated<T> | T[]): Paginated<T> => (
+  Array.isArray(data)
+    ? { count: data.length, next: null, previous: null, results: data }
+    : data
+);
 
 const money = (value: string | number) => Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const errorMessage = (error: unknown, fallback: string) => {
@@ -25,10 +33,49 @@ const errorMessage = (error: unknown, fallback: string) => {
   return Array.isArray(fieldError) && fieldError[0] ? String(fieldError[0]) : fallback;
 };
 
+const rejectionResolution = (document: Documento) => {
+  const message = (document.mensagem_sefaz || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+  if (document.codigo_status === '391' || message.includes('dados do cartao')) {
+    return {
+      label: 'Corrigir e reenviar',
+      guidance: 'O pagamento eletrônico será reenviado como terminal não integrado ao PDV.',
+      confirmation: 'O sistema incluirá os dados fiscais do pagamento eletrônico e reenviará o mesmo número do documento.',
+    };
+  }
+  if (message.includes('connection timed out') || message.includes('erro http: 0') || message.includes('tempo limite') || message.includes('timeout')) {
+    return {
+      label: 'Reprocessar',
+      guidance: 'Falha de comunicação com a SEFAZ. O reprocessamento preserva número, série e referência.',
+      confirmation: 'Houve falha de comunicação. Confirma o reprocessamento usando o mesmo número, série e referência fiscal?',
+    };
+  }
+  return {
+    label: 'Resolver e reenviar',
+    guidance: 'Confira o motivo retornado pela SEFAZ antes de tentar novamente.',
+    confirmation: 'Confirma o reenvio do mesmo documento após conferir o motivo da rejeição?',
+  };
+};
+
+function FiscalPagination({ page, count, onChange }: { page: number; count: number; onChange: (page: number) => void }) {
+  const pages = Math.max(1, Math.ceil(count / PAGE_SIZE));
+  if (pages <= 1) return null;
+  return <div className="pagination-bar">
+    <button className="btn btn-ghost btn-sm" disabled={page <= 1} onClick={() => onChange(page - 1)}>Anterior</button>
+    <span>Página {page} de {pages} · {count} registros</span>
+    <button className="btn btn-ghost btn-sm" disabled={page >= pages} onClick={() => onChange(page + 1)}>Próxima</button>
+  </div>;
+}
+
 export default function Fiscal() {
   const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
   const canManage = !user?.papel || ['ADMIN', 'GERENTE'].includes(user.papel);
+  const [eligiblePage, setEligiblePage] = useState(1);
+  const [documentsPage, setDocumentsPage] = useState(1);
   const [invalidation, setInvalidation] = useState({
     tipo: 'NFCE' as FiscalType,
     serie: '',
@@ -45,13 +92,19 @@ export default function Fiscal() {
     queryClient.invalidateQueries({ queryKey: ['fiscal-monitor'] });
     queryClient.invalidateQueries({ queryKey: ['fiscal-cartas-correcao'] });
   };
-  const eligible = useQuery<VendaElegivel[]>({
-    queryKey: ['fiscal-vendas-elegiveis'],
-    queryFn: async () => { const { data } = await api.get('/fiscal/documentos/vendas-elegiveis/'); return data.results || data; },
+  const eligible = useQuery<Paginated<VendaElegivel>>({
+    queryKey: ['fiscal-vendas-elegiveis', eligiblePage],
+    queryFn: async () => {
+      const { data } = await api.get<Paginated<VendaElegivel> | VendaElegivel[]>('/fiscal/documentos/vendas-elegiveis/', { params: { page: eligiblePage } });
+      return normalizePage(data);
+    },
   });
-  const documents = useQuery<Documento[]>({
-    queryKey: ['fiscal-documentos'],
-    queryFn: async () => { const { data } = await api.get('/fiscal/documentos/'); return data.results || data; },
+  const documents = useQuery<Paginated<Documento>>({
+    queryKey: ['fiscal-documentos', documentsPage],
+    queryFn: async () => {
+      const { data } = await api.get<Paginated<Documento> | Documento[]>('/fiscal/documentos/', { params: { page: documentsPage } });
+      return normalizePage(data);
+    },
   });
   const config = useQuery<ConfigFiscal>({
     queryKey: ['fiscal-config-resumo'],
@@ -116,6 +169,11 @@ export default function Fiscal() {
   const correctDocument = (document: Documento) => {
     const text = window.prompt('Descreva exatamente a correção da NF-e (mínimo de 15 caracteres). Não é permitido alterar valores, impostos, remetente ou destinatário:');
     if (text) correct.mutate({ id: document.id, texto: text });
+  };
+  const resolveDocument = (document: Documento) => {
+    const resolution = rejectionResolution(document);
+    if (!window.confirm(`${resolution.confirmation}\n\nDocumento: ${document.tipo_display} nº ${document.numero || '—'}, série ${document.serie || '—'}.`)) return;
+    issue.mutate({ venda: document.venda_numero, tipo: document.tipo });
   };
   const download = async (document: Documento, format: 'xml' | 'pdf') => {
     try {
@@ -199,10 +257,39 @@ export default function Fiscal() {
 
     <div className="card" style={{ marginBottom: 20, padding: 20 }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 14 }}><div><h2 style={{ margin: 0, fontSize: '1rem' }}><ReceiptText size={18} style={{ verticalAlign: 'middle', marginRight: 7 }} />Vendas prontas para emitir</h2><small style={{ color: 'var(--text-muted)' }}>NFC-e para consumidor final; NF-e exige cliente e endereço fiscal completos.</small></div><button className="btn btn-ghost btn-sm" onClick={refresh}><RefreshCw size={15} />Atualizar</button></header>
-      {eligible.isLoading ? <div className="loading">Carregando vendas...</div> : eligible.data?.length ? <div className="table-wrapper"><table className="table"><thead><tr><th>Venda</th><th>Cliente</th><th>Itens</th><th>Total</th><th /></tr></thead><tbody>{eligible.data.map((venda) => <tr key={venda.id}><td>#{venda.id}</td><td>{venda.cliente_nome || 'Consumidor final'}</td><td>{venda.itens_count}</td><td>{money(venda.total_liquido)}</td><td style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}><button className="btn btn-primary btn-sm" disabled={issue.isPending} onClick={() => issue.mutate({ venda: venda.id, tipo: 'NFCE' })}><FileCheck2 size={15} />NFC-e</button><button className="btn btn-ghost btn-sm" disabled={issue.isPending || !venda.cliente_nome} onClick={() => issue.mutate({ venda: venda.id, tipo: 'NFE' })}><FileText size={15} />NF-e</button></td></tr>)}</tbody></table></div> : <p style={{ color: 'var(--text-muted)', margin: 0 }}>Nenhuma venda finalizada aguardando emissão.</p>}
+      {eligible.isLoading ? <div className="loading">Carregando vendas...</div> : eligible.data?.results.length ? <>
+        <div className="table-wrapper"><table className="table"><thead><tr><th>Venda</th><th>Cliente</th><th>Itens</th><th>Total</th><th /></tr></thead><tbody>{eligible.data.results.map((venda) => <tr key={venda.id}><td>#{venda.id}</td><td>{venda.cliente_nome || 'Consumidor final'}</td><td>{venda.itens_count}</td><td>{money(venda.total_liquido)}</td><td style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}><button className="btn btn-primary btn-sm" disabled={issue.isPending} onClick={() => issue.mutate({ venda: venda.id, tipo: 'NFCE' })}><FileCheck2 size={15} />NFC-e</button><button className="btn btn-ghost btn-sm" disabled={issue.isPending || !venda.cliente_nome} onClick={() => issue.mutate({ venda: venda.id, tipo: 'NFE' })}><FileText size={15} />NF-e</button></td></tr>)}</tbody></table></div>
+        <FiscalPagination page={eligiblePage} count={eligible.data.count} onChange={setEligiblePage} />
+      </> : <p style={{ color: 'var(--text-muted)', margin: 0 }}>Nenhuma venda finalizada aguardando emissão.</p>}
     </div>
 
-    <div className="card" style={{ padding: 20, marginBottom: 20 }}><h2 style={{ margin: '0 0 14px', fontSize: '1rem' }}>Documentos recentes</h2>{documents.isLoading ? <div className="loading">Carregando documentos...</div> : documents.data?.length ? <div className="table-wrapper"><table className="table"><thead><tr><th>Venda</th><th>Documento</th><th>Status</th><th>Ambiente</th><th /></tr></thead><tbody>{documents.data.map((document) => <tr key={document.id}><td>#{document.venda_numero}</td><td>{document.tipo_display}{document.numero && <small style={{ display: 'block' }}>Nº {document.numero} · Série {document.serie}</small>}</td><td><span className={`badge ${document.status === 'AUTORIZADA' ? 'badge-green' : ['REJEITADA', 'ERRO', 'INDEFINIDO'].includes(document.status) ? 'badge-red' : 'badge-yellow'}`}>{document.status_display}</span>{document.mensagem_sefaz && <small style={{ display: 'block', color: 'var(--text-muted)' }}>{document.mensagem_sefaz}</small>}{document.status === 'AUTORIZADA' && !document.pode_cancelar && <small style={{ display: 'block', color: '#ef4444' }}>{document.motivo_cancelamento}</small>}</td><td>{document.ambiente}</td><td style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>{document.status === 'REJEITADA' && <button className="btn btn-primary btn-sm" disabled={issue.isPending} onClick={() => issue.mutate({ venda: document.venda_numero, tipo: document.tipo })}><Repeat2 size={14} />Reenviar</button>}{document.pode_baixar_xml && <button className="btn btn-ghost btn-sm" onClick={() => download(document, 'xml')}><Download size={14} />XML</button>}{document.pode_baixar_pdf && <button className="btn btn-ghost btn-sm" onClick={() => download(document, 'pdf')}><Download size={14} />PDF</button>}{canManage && document.tipo === 'NFE' && document.status === 'AUTORIZADA' && <button className="btn btn-ghost btn-sm" disabled={correct.isPending} onClick={() => correctDocument(document)}><PenLine size={14} />CC-e</button>}{document.pode_cancelar && <button className="btn btn-ghost btn-sm" disabled={cancel.isPending} onClick={() => cancelDocument(document)}><XCircle size={14} />Cancelar</button>}</td></tr>)}</tbody></table></div> : <p style={{ color: 'var(--text-muted)', margin: 0 }}>Nenhum documento fiscal emitido.</p>}</div>
+    <div className="card" style={{ padding: 20, marginBottom: 20 }}>
+      <h2 style={{ margin: '0 0 14px', fontSize: '1rem' }}>Documentos recentes</h2>
+      {documents.isLoading ? <div className="loading">Carregando documentos...</div> : documents.data?.results.length ? <>
+        <div className="table-wrapper"><table className="table"><thead><tr><th>Venda</th><th>Documento</th><th>Status</th><th>Ambiente</th><th /></tr></thead><tbody>{documents.data.results.map((document) => {
+          const resolution = rejectionResolution(document);
+          return <tr key={document.id}>
+            <td>#{document.venda_numero}</td>
+            <td>{document.tipo_display}{document.numero && <small style={{ display: 'block' }}>Nº {document.numero} · Série {document.serie}</small>}</td>
+            <td>
+              <span className={`badge ${document.status === 'AUTORIZADA' ? 'badge-green' : document.status === 'INDEFINIDO' ? 'badge-yellow' : ['REJEITADA', 'ERRO'].includes(document.status) ? 'badge-red' : 'badge-yellow'}`}>{document.status_display}</span>
+              {document.mensagem_sefaz && <small style={{ display: 'block', color: 'var(--text-muted)', maxWidth: 640 }}>{document.mensagem_sefaz}</small>}
+              {document.status === 'REJEITADA' && <small style={{ display: 'flex', gap: 5, alignItems: 'center', color: 'var(--accent-yellow)', marginTop: 5 }}><AlertTriangle size={13} />{resolution.guidance}</small>}
+              {document.status === 'AUTORIZADA' && !document.pode_cancelar && <small style={{ display: 'block', color: '#ef4444' }}>{document.motivo_cancelamento}</small>}
+            </td>
+            <td>{document.ambiente}</td>
+            <td style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              {document.status === 'REJEITADA' && <button className="btn btn-primary btn-sm" disabled={issue.isPending} onClick={() => resolveDocument(document)}><Repeat2 size={14} />{resolution.label}</button>}
+              {document.pode_baixar_xml && <button className="btn btn-ghost btn-sm" onClick={() => download(document, 'xml')}><Download size={14} />XML</button>}
+              {document.pode_baixar_pdf && <button className="btn btn-ghost btn-sm" onClick={() => download(document, 'pdf')}><Download size={14} />PDF</button>}
+              {canManage && document.tipo === 'NFE' && document.status === 'AUTORIZADA' && <button className="btn btn-ghost btn-sm" disabled={correct.isPending} onClick={() => correctDocument(document)}><PenLine size={14} />CC-e</button>}
+              {document.pode_cancelar && <button className="btn btn-ghost btn-sm" disabled={cancel.isPending} onClick={() => cancelDocument(document)}><XCircle size={14} />Cancelar</button>}
+            </td>
+          </tr>;
+        })}</tbody></table></div>
+        <FiscalPagination page={documentsPage} count={documents.data.count} onChange={setDocumentsPage} />
+      </> : <p style={{ color: 'var(--text-muted)', margin: 0 }}>Nenhum documento fiscal emitido.</p>}
+    </div>
 
     {canManage && correctionLetters.data?.length ? <div className="card" style={{ padding: 20, marginBottom: 20 }}><h2 style={{ margin: '0 0 14px', fontSize: '1rem' }}>Cartas de Correção</h2><div className="table-wrapper"><table className="table"><thead><tr><th>NF-e</th><th>Sequência</th><th>Correção</th><th>Status</th><th>Protocolo</th><th /></tr></thead><tbody>{correctionLetters.data.map((record) => <tr key={record.id_externo}><td>Nº {record.documento_numero} · Série {record.documento_serie}</td><td>{record.sequencia}</td><td>{record.texto_correcao}</td><td><span className={`badge ${record.status === 'REGISTRADA' ? 'badge-green' : 'badge-red'}`}>{record.status_display}</span>{record.mensagem_sefaz && <small style={{ display: 'block', color: 'var(--text-muted)' }}>{record.mensagem_sefaz}</small>}</td><td>{record.protocolo || '—'}</td><td>{record.pode_baixar_xml && <button className="btn btn-ghost btn-sm" onClick={() => downloadCorrectionXml(record)}><Download size={14} />XML</button>}</td></tr>)}</tbody></table></div></div> : null}
 
