@@ -27,7 +27,6 @@ import { imprimirCupom } from '../../lib/impressao';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Produto, ItemCarrinho, Sessao, Venda, Pagamento } from './types';
 import CashOpsModal from './CashOpsModal';
-import ProdutoModal from '../Produtos/ProdutoModal';
 import Modal from '../../components/Modal';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 
@@ -197,7 +196,9 @@ export default function PDV() {
   const [printData, setPrintData] = useState<CupomDados | null>(null);
   const [documentoFiscal, setDocumentoFiscal] = useState<DocumentoFiscalPdv | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [editingProduct, setEditingProduct] = useState<Produto | null>(null);
+  const [editingPrice, setEditingPrice] = useState('');
+  const [isSavingPrice, setIsSavingPrice] = useState(false);
 
   // Persistência local do estado da venda
   useEffect(() => {
@@ -479,50 +480,73 @@ export default function PDV() {
 
   const handleEditProduct = async (item: ItemCarrinho) => {
     try {
-      const { data } = await api.get(`/produtos/${item.produto_id}/`);
+      const { data } = await api.get<Produto>(`/produtos/${item.produto_id}/`);
       setEditingProduct(data);
+      setEditingPrice(Number(data.preco_venda).toFixed(2));
       setShowEditModal(true);
     } catch {
       toast.error('Erro ao carregar dados do produto.');
     }
   };
 
-  const handleEditSuccess = async () => {
+  const closeEditPriceModal = () => {
+    if (isSavingPrice) return;
+    setShowEditModal(false);
+    setEditingProduct(null);
+    setEditingPrice('');
+    window.setTimeout(() => buscaRef.current?.focus(), 0);
+  };
+
+  const handleEditPrice = async () => {
     if (!editingProduct) return;
+    const parsedPrice = Number(editingPrice.replace(',', '.'));
+    if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
+      toast.error('Informe um preço de venda maior que zero.');
+      return;
+    }
 
+    setIsSavingPrice(true);
     try {
-      const { data: updatedProd } = await api.get(`/produtos/${editingProduct.id}/`);
+      const { data: updatedProd } = await api.patch<Produto>(
+        `/produtos/${editingProduct.id}/preco-pdv/`,
+        { preco_venda: parsedPrice.toFixed(2) },
+      );
+      const novoPreco = Number(updatedProd.preco_venda);
+      const itensToUpdate = carrinho.filter(item => item.produto_id === updatedProd.id);
 
-      // Atualiza o carrinho local
+      await Promise.all(itensToUpdate
+        .filter(item => item.id)
+        .map(item => api.patch(`/venda-itens/${item.id}/`, {
+          quantidade: item.quantidade,
+        })));
+
       setCarrinho(prev => prev.map(item => {
         if (item.produto_id === updatedProd.id) {
-          const novaPreco = Number(updatedProd.preco_venda);
           return {
             ...item,
             nome: updatedProd.nome,
-            preco_unitario: novaPreco,
-            subtotal: item.quantidade * novaPreco
+            preco_unitario: novoPreco,
+            subtotal: item.quantidade * novoPreco,
           };
         }
         return item;
       }));
 
-      // Atualiza os itens no servidor
-      const itensToUpdate = carrinho.filter(i => i.produto_id === updatedProd.id);
-      for (const item of itensToUpdate) {
-        if (item.id) {
-          const novaPreco = Number(updatedProd.preco_venda);
-          await api.patch(`/venda-itens/${item.id}/`, {
-            preco_unitario: novaPreco,
-            subtotal: item.quantidade * novaPreco
-          });
-        }
-      }
-
       await queryClient.invalidateQueries({ queryKey: ['venda-aberta'] });
-      toast.success('Produto e carrinho atualizados!');
-    } catch (e) {
-      console.error(e);
+      toast.success('Preço de venda atualizado!');
+      setShowEditModal(false);
+      setEditingProduct(null);
+      setEditingPrice('');
+      window.setTimeout(() => buscaRef.current?.focus(), 0);
+    } catch (error: any) {
+      await queryClient.invalidateQueries({ queryKey: ['venda-aberta'] });
+      toast.error(
+        error.response?.data?.detail
+        || error.response?.data?.preco_venda?.[0]
+        || 'Não foi possível atualizar o preço.',
+      );
+    } finally {
+      setIsSavingPrice(false);
     }
   };
 
@@ -989,8 +1013,8 @@ export default function PDV() {
                                 type="button"
                                 className="pdv-item-action"
                                 onClick={() => handleEditProduct(item)}
-                                title="Editar Produto"
-                                aria-label={`Editar ${item.nome}`}
+                                title="Alterar preço de venda"
+                                aria-label={`Alterar preço de ${item.nome}`}
                               >
                                 <Edit3 size={14} />
                               </button>
@@ -1429,11 +1453,62 @@ export default function PDV() {
         </Modal>
       )}
       {showEditModal && editingProduct && (
-        <ProdutoModal
-          produto={editingProduct}
-          onClose={() => setShowEditModal(false)}
-          onSuccess={handleEditSuccess}
-        />
+        <Modal
+          onClose={closeEditPriceModal}
+          labelledBy="pdv-edit-price-title"
+          describedBy="pdv-edit-price-description"
+          panelClassName="modal-content modal-panel-sm"
+          isBusy={isSavingPrice}
+        >
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void handleEditPrice();
+            }}
+          >
+            <div className="modal-header">
+              <div>
+                <h2 id="pdv-edit-price-title" className="modal-title">Alterar preço de venda</h2>
+                <p id="pdv-edit-price-description" className="modal-subtitle">
+                  {editingProduct.nome}. Esta alteração também vale para as próximas vendas.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn-icon"
+                onClick={closeEditPriceModal}
+                aria-label="Fechar alteração de preço"
+                disabled={isSavingPrice}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="pdv-edit-price">Novo preço de venda (R$)</label>
+              <input
+                id="pdv-edit-price"
+                className="input input-emphasis"
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                data-modal-initial-focus
+                value={editingPrice}
+                onChange={event => setEditingPrice(event.target.value)}
+                onFocus={event => event.currentTarget.select()}
+                disabled={isSavingPrice}
+              />
+              <p className="field-hint">Somente o preço será alterado; estoque e dados fiscais permanecem protegidos.</p>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-ghost" onClick={closeEditPriceModal} disabled={isSavingPrice}>
+                Cancelar
+              </button>
+              <button type="submit" className="btn btn-primary" disabled={isSavingPrice}>
+                {isSavingPrice ? <><Loader2 size={18} className="animate-spin" /> Salvando...</> : 'Salvar preço'}
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
     </div>
   );
