@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
@@ -75,11 +75,11 @@ describe('Confirmações fiscais', () => {
   it('filtra por status no servidor, preserva a venda e volta à primeira página', async () => {
     const user = userEvent.setup(); mount('/fiscal?venda=7&pagina=2');
     expect(await screen.findByRole('link', { name: 'Ver venda #7' })).toHaveAttribute('href', '/vendas?venda=7');
-    expect(get).toHaveBeenCalledWith('/fiscal/documentos/', { params: { page: 2, venda: '7', status: undefined } });
+    expect(get).toHaveBeenCalledWith('/fiscal/documentos/', { params: { page: 2, venda: '7', status: undefined, q: undefined } });
     await user.selectOptions(screen.getByLabelText('Status do documento'), 'REJEITADA');
-    expect(get).toHaveBeenCalledWith('/fiscal/documentos/', { params: { page: 1, venda: '7', status: 'REJEITADA' } });
+    expect(get).toHaveBeenCalledWith('/fiscal/documentos/', { params: { page: 1, venda: '7', status: 'REJEITADA', q: undefined } });
     await user.selectOptions(screen.getByLabelText('Status do documento'), '');
-    expect(get).toHaveBeenCalledWith('/fiscal/documentos/', { params: { page: 1, venda: '7', status: undefined } });
+    expect(get).toHaveBeenCalledWith('/fiscal/documentos/', { params: { page: 1, venda: '7', status: undefined, q: undefined } });
   });
 
   it('remove os cinco avisos solicitados e preserva informações do certificado', async () => {
@@ -88,4 +88,16 @@ describe('Confirmações fiscais', () => {
     expect(screen.queryByText(/Aviso removido/)).not.toBeInTheDocument();
     expect(screen.queryByText('Descrição removida')).not.toBeInTheDocument();
   });
+  it('busca pelo número ou pela chave preservando status e venda, na primeira página', async () => {
+    mount('/fiscal?venda=7&status=REJEITADA&pagina=2');
+    const search = screen.getByLabelText('Buscar nota fiscal');
+    fireEvent.change(search, { target: { value: '14056' } });
+    await waitFor(() => expect(get).toHaveBeenCalledWith('/fiscal/documentos/', { params: { page: 1, venda: '7', status: 'REJEITADA', q: '14056' } }));
+    const key = '9'.repeat(44);
+    fireEvent.change(search, { target: { value: key } });
+    await waitFor(() => expect(get).toHaveBeenCalledWith('/fiscal/documentos/', { params: { page: 1, venda: '7', status: 'REJEITADA', q: key } }));
+    fireEvent.change(search, { target: { value: '' } });
+    await waitFor(() => expect(get).toHaveBeenCalledWith('/fiscal/documentos/', { params: { page: 1, venda: '7', status: 'REJEITADA', q: undefined } }));
+  });
+
 });

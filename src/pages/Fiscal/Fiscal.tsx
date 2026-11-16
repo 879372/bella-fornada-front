@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
-import { Activity, AlertTriangle, Ban, Download, PenLine, RefreshCw, Repeat2, XCircle } from 'lucide-react';
+import { Activity, AlertTriangle, Ban, Download, PenLine, RefreshCw, Repeat2, Search, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '../../lib/api';
 import ConfirmModal from '../../components/ConfirmModal';
@@ -86,6 +86,7 @@ export default function Fiscal() {
   const [searchParams, setSearchParams] = useSearchParams();
   const saleFilter = searchParams.get('venda') || '';
   const statusFilter = searchParams.get('status') || '';
+  const searchTerm = searchParams.get('q') || '';
   const parsedPage = Number(searchParams.get('pagina'));
   const documentsPage = Number.isInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1;
   const setDocumentFilter = (key: string, value: string) => setSearchParams(current => {
@@ -93,7 +94,7 @@ export default function Fiscal() {
     if (value) next.set(key, value); else next.delete(key);
     if (key !== 'pagina') next.delete('pagina');
     return next;
-  }, { preventScrollReset: true });
+  }, { preventScrollReset: true, replace: key === 'q' });
   const setDocumentsPage = (page: number) => setDocumentFilter('pagina', String(page));
   const [action, setAction] = useState<FiscalAction | null>(null);
   const [reason, setReason] = useState('');
@@ -117,9 +118,9 @@ export default function Fiscal() {
     queryClient.invalidateQueries({ queryKey: ['fiscal-cartas-correcao'] });
   };
   const documents = useQuery<Paginated<Documento>>({
-    queryKey: ['fiscal-documentos', documentsPage, saleFilter, statusFilter],
+    queryKey: ['fiscal-documentos', documentsPage, saleFilter, statusFilter, searchTerm],
     queryFn: async () => {
-      const { data } = await api.get<Paginated<Documento> | Documento[]>('/fiscal/documentos/', { params: { page: documentsPage, venda: saleFilter || undefined, status: statusFilter || undefined } });
+      const { data } = await api.get<Paginated<Documento> | Documento[]>('/fiscal/documentos/', { params: { page: documentsPage, venda: saleFilter || undefined, status: statusFilter || undefined, q: searchTerm || undefined } });
       return normalizePage(data);
     },
   });
@@ -300,6 +301,13 @@ export default function Fiscal() {
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
         <div><h2 style={{ margin: 0, fontSize: '1rem' }}>Documentos recentes</h2>
           {saleFilter && <p style={{ margin: '8px 0 0' }}>Notas da venda #{saleFilter} · <Link to={`/vendas?venda=${encodeURIComponent(saleFilter)}`}>Ver venda</Link> · <button className="btn btn-ghost btn-sm" onClick={() => setDocumentFilter('venda', '')}>Todas as vendas</button></p>}
+        </div>
+        <div style={{ flex: '1 1 280px', maxWidth: 460 }}>
+          <label className="form-label" htmlFor="fiscal-document-search">Buscar nota fiscal</label>
+          <div className="search-input-wrapper" style={{ margin: 0 }}>
+            <Search className="search-icon" size={18} aria-hidden="true" />
+            <input id="fiscal-document-search" className="input" type="search" placeholder="Número da nota ou chave de acesso" value={searchTerm} onChange={event => setDocumentFilter('q', event.target.value)} />
+          </div>
         </div>
         <div><label className="form-label" htmlFor="fiscal-document-status">Status do documento</label>
           <select id="fiscal-document-status" className="input" value={statusFilter} onChange={event => setDocumentFilter('status', event.target.value)}>
