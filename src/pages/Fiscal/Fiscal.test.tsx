@@ -1,6 +1,7 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Fiscal from './Fiscal';
 
@@ -14,9 +15,9 @@ const document = {
   pode_inutilizar: true, pode_cancelar: false, created_at: '2026-11-16T12:00:00Z',
 };
 
-function mount() {
+function mount(path = '/fiscal') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-  render(<QueryClientProvider client={client}><Fiscal /></QueryClientProvider>);
+  render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[path]}><Fiscal /></MemoryRouter></QueryClientProvider>);
 }
 
 describe('Confirmações fiscais', () => {
@@ -26,7 +27,10 @@ describe('Confirmações fiscais', () => {
       if (url === '/fiscal/configuracao/') return { data: { ambiente: 'producao', serie_nfce: '1' } };
       if (url === '/fiscal/documentos/') return { data: { count: 1, results: [document] } };
       if (url === '/fiscal/documentos/totalizadores/') return { data: { ambiente: 'producao', transmitidas: { quantidade: 2, valor: '30.00' }, pendentes: { quantidade: 1, valor: '15.00' } } };
-      if (url === '/fiscal/monitor/') return { data: { certificado: { mensagem: 'Válido' }, resumo: {}, alertas: [] } };
+      if (url === '/fiscal/monitor/') return { data: { certificado: { mensagem: 'Válido' }, resumo: {}, alertas: [
+        ...['RESULTADO_INDEFINIDO', 'DOCUMENTO_REJEITADO', 'ERRO_FISCAL', 'VENDAS_SEM_DOCUMENTO', 'CONTINGENCIA_NAO_SUPORTADA'].map(codigo => ({ codigo, titulo: `Aviso removido ${codigo}`, descricao: 'Descrição removida', nivel: 'AVISO', quantidade: 1 })),
+        { codigo: 'CERTIFICADO_INVALIDO', titulo: 'Certificado A1 indisponível', descricao: 'Confira o certificado.', nivel: 'ERRO', quantidade: 1 },
+      ] } };
       return { data: [] };
     });
     post.mockResolvedValue({ data: { status: 'INUTILIZADA', numero_inicial: 123, numero_final: 123 } });
@@ -66,5 +70,22 @@ describe('Confirmações fiscais', () => {
     expect(post).not.toHaveBeenCalled();
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Reenviar documento' }));
     expect(post).toHaveBeenCalledExactlyOnceWith('/fiscal/documentos/emitir/', { venda: 7, tipo: 'NFCE', canal: 'PDV' });
+  });
+
+  it('filtra por status no servidor, preserva a venda e volta à primeira página', async () => {
+    const user = userEvent.setup(); mount('/fiscal?venda=7&pagina=2');
+    expect(await screen.findByRole('link', { name: 'Ver venda #7' })).toHaveAttribute('href', '/vendas?venda=7');
+    expect(get).toHaveBeenCalledWith('/fiscal/documentos/', { params: { page: 2, venda: '7', status: undefined } });
+    await user.selectOptions(screen.getByLabelText('Status do documento'), 'REJEITADA');
+    expect(get).toHaveBeenCalledWith('/fiscal/documentos/', { params: { page: 1, venda: '7', status: 'REJEITADA' } });
+    await user.selectOptions(screen.getByLabelText('Status do documento'), '');
+    expect(get).toHaveBeenCalledWith('/fiscal/documentos/', { params: { page: 1, venda: '7', status: undefined } });
+  });
+
+  it('remove os cinco avisos solicitados e preserva informações do certificado', async () => {
+    mount();
+    expect(await screen.findByText('Certificado A1 indisponível')).toBeInTheDocument();
+    expect(screen.queryByText(/Aviso removido/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Descrição removida')).not.toBeInTheDocument();
   });
 });

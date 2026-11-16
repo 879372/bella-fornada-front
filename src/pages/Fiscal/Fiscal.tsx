@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
 import { Activity, AlertTriangle, Ban, Download, PenLine, RefreshCw, Repeat2, XCircle } from 'lucide-react';
@@ -22,6 +23,11 @@ type InvalidationPayload = { tipo: FiscalType; serie: string; ano: number; numer
 type FiscalAction = { kind: 'cancel' | 'correct' | 'resolve'; document: Documento } | { kind: 'invalidate'; payload: InvalidationPayload };
 
 const PAGE_SIZE = 50;
+const HIDDEN_MONITOR_ALERTS = new Set(['RESULTADO_INDEFINIDO', 'DOCUMENTO_REJEITADO', 'ERRO_FISCAL', 'VENDAS_SEM_DOCUMENTO', 'CONTINGENCIA_NAO_SUPORTADA']);
+const DOCUMENT_STATUSES = [
+  ['PENDENTE', 'Pendente'], ['PROCESSANDO', 'Processando'], ['AUTORIZADA', 'Autorizada'],
+  ['REJEITADA', 'Rejeitada'], ['CANCELADA', 'Cancelada'], ['ERRO', 'Erro'], ['INDEFINIDO', 'Resultado indefinido'],
+];
 const normalizePage = <T,>(data: Paginated<T> | T[]): Paginated<T> => (
   Array.isArray(data)
     ? { count: data.length, next: null, previous: null, results: data }
@@ -77,7 +83,18 @@ export default function Fiscal() {
   const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
   const canManage = !user?.papel || ['ADMIN', 'GERENTE'].includes(user.papel);
-  const [documentsPage, setDocumentsPage] = useState(1);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const saleFilter = searchParams.get('venda') || '';
+  const statusFilter = searchParams.get('status') || '';
+  const parsedPage = Number(searchParams.get('pagina'));
+  const documentsPage = Number.isInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+  const setDocumentFilter = (key: string, value: string) => setSearchParams(current => {
+    const next = new URLSearchParams(current);
+    if (value) next.set(key, value); else next.delete(key);
+    if (key !== 'pagina') next.delete('pagina');
+    return next;
+  }, { preventScrollReset: true });
+  const setDocumentsPage = (page: number) => setDocumentFilter('pagina', String(page));
   const [action, setAction] = useState<FiscalAction | null>(null);
   const [reason, setReason] = useState('');
   const openAction = (next: FiscalAction) => { setReason(''); setAction(next); };
@@ -100,9 +117,9 @@ export default function Fiscal() {
     queryClient.invalidateQueries({ queryKey: ['fiscal-cartas-correcao'] });
   };
   const documents = useQuery<Paginated<Documento>>({
-    queryKey: ['fiscal-documentos', documentsPage],
+    queryKey: ['fiscal-documentos', documentsPage, saleFilter, statusFilter],
     queryFn: async () => {
-      const { data } = await api.get<Paginated<Documento> | Documento[]>('/fiscal/documentos/', { params: { page: documentsPage } });
+      const { data } = await api.get<Paginated<Documento> | Documento[]>('/fiscal/documentos/', { params: { page: documentsPage, venda: saleFilter || undefined, status: statusFilter || undefined } });
       return normalizePage(data);
     },
   });
@@ -257,6 +274,7 @@ export default function Fiscal() {
   };
 
   const environment = config.data?.ambiente;
+  const monitorAlerts = monitor.data?.alertas.filter(alert => !HIDDEN_MONITOR_ALERTS.has(alert.codigo)) || [];
   return <div className="animate-in">
     <div className="page-header"><h1 className="page-title">Notas fiscais</h1><p className="page-subtitle">Emissão, reenvio, cancelamento e inutilização de NF-e e NFC-e pela Geranet.</p></div>
 
@@ -275,16 +293,26 @@ export default function Fiscal() {
         ['Erros', monitor.data.resumo.erros],
         ['Vendas sem nota', monitor.data.resumo.vendas_sem_documento],
       ].map(([label, value]) => <div key={String(label)} style={{ padding: 12, border: '1px solid var(--border)', borderRadius: 8 }}><small style={{ color: 'var(--text-muted)' }}>{label}</small><strong style={{ display: 'block', fontSize: '1.3rem' }}>{value}</strong></div>)}</div>
-      {monitor.data.alertas.length ? <div style={{ display: 'grid', gap: 8 }}>{monitor.data.alertas.map((alert) => <div key={alert.codigo} style={{ padding: 10, borderRadius: 8, border: `1px solid ${alert.nivel === 'ERRO' ? '#ef4444' : alert.nivel === 'AVISO' ? '#f59e0b' : 'var(--border)'}` }}><strong>{alert.titulo}{alert.quantidade > 1 ? ` (${alert.quantidade})` : ''}</strong><small style={{ display: 'block', color: 'var(--text-muted)', marginTop: 3 }}>{alert.descricao}</small></div>)}</div> : <p style={{ color: 'var(--text-muted)', margin: 0 }}>Nenhum alerta fiscal encontrado.</p>}</>}
+      {monitorAlerts.length ? <div style={{ display: 'grid', gap: 8 }}>{monitorAlerts.map((alert) => <div key={alert.codigo} style={{ padding: 10, borderRadius: 8, border: `1px solid ${alert.nivel === 'ERRO' ? '#ef4444' : alert.nivel === 'AVISO' ? '#f59e0b' : 'var(--border)'}` }}><strong>{alert.titulo}{alert.quantidade > 1 ? ` (${alert.quantidade})` : ''}</strong><small style={{ display: 'block', color: 'var(--text-muted)', marginTop: 3 }}>{alert.descricao}</small></div>)}</div> : null}</>}
     </div>}
 
     <div className="card" style={{ padding: 20, marginBottom: 20 }}>
-      <h2 style={{ margin: '0 0 14px', fontSize: '1rem' }}>Documentos recentes</h2>
-      {documents.isLoading ? <div className="loading">Carregando documentos...</div> : documents.data?.results.length ? <>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
+        <div><h2 style={{ margin: 0, fontSize: '1rem' }}>Documentos recentes</h2>
+          {saleFilter && <p style={{ margin: '8px 0 0' }}>Notas da venda #{saleFilter} · <Link to={`/vendas?venda=${encodeURIComponent(saleFilter)}`}>Ver venda</Link> · <button className="btn btn-ghost btn-sm" onClick={() => setDocumentFilter('venda', '')}>Todas as vendas</button></p>}
+        </div>
+        <div><label className="form-label" htmlFor="fiscal-document-status">Status do documento</label>
+          <select id="fiscal-document-status" className="input" value={statusFilter} onChange={event => setDocumentFilter('status', event.target.value)}>
+            <option value="">Todos os status</option>
+            {DOCUMENT_STATUSES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </div>
+      </header>
+      {documents.isError ? <p role="alert">Não foi possível carregar os documentos. <button className="btn btn-ghost btn-sm" onClick={() => documents.refetch()}>Tentar novamente</button></p> : documents.isLoading ? <div className="loading">Carregando documentos...</div> : documents.data?.results.length ? <>
         <div className="table-wrapper"><table className="table"><thead><tr><th>Venda</th><th>Documento</th><th>Status</th><th>Ambiente</th><th /></tr></thead><tbody>{documents.data.results.map((document) => {
           const resolution = rejectionResolution(document);
           return <tr key={document.id}>
-            <td>#{document.venda_numero}</td>
+            <td>{document.venda_numero ? <Link className="btn btn-ghost btn-sm" to={`/vendas?venda=${document.venda_numero}`} aria-label={`Ver venda #${document.venda_numero}`}>Ver venda #{document.venda_numero}</Link> : 'Sem venda vinculada'}</td>
             <td>{document.tipo_display}{document.numero && <small style={{ display: 'block' }}>Nº {document.numero} · Série {document.serie}</small>}</td>
             <td>
               <span className={`badge ${document.status === 'AUTORIZADA' ? 'badge-green' : document.status === 'INDEFINIDO' ? 'badge-yellow' : ['REJEITADA', 'ERRO'].includes(document.status) ? 'badge-red' : 'badge-yellow'}`}>{document.status_display}</span>
@@ -304,7 +332,7 @@ export default function Fiscal() {
           </tr>;
         })}</tbody></table></div>
         <FiscalPagination page={documentsPage} count={documents.data.count} onChange={setDocumentsPage} />
-      </> : <p style={{ color: 'var(--text-muted)', margin: 0 }}>Nenhum documento fiscal emitido.</p>}
+      </> : <p style={{ color: 'var(--text-muted)', margin: 0 }}>Nenhum documento fiscal encontrado para os filtros selecionados.</p>}
     </div>
 
     {canManage && correctionLetters.data?.length ? <div className="card" style={{ padding: 20, marginBottom: 20 }}><h2 style={{ margin: '0 0 14px', fontSize: '1rem' }}>Cartas de Correção</h2><div className="table-wrapper"><table className="table"><thead><tr><th>NF-e</th><th>Sequência</th><th>Correção</th><th>Status</th><th>Protocolo</th><th /></tr></thead><tbody>{correctionLetters.data.map((record) => <tr key={record.id_externo}><td>Nº {record.documento_numero} · Série {record.documento_serie}</td><td>{record.sequencia}</td><td>{record.texto_correcao}</td><td><span className={`badge ${record.status === 'REGISTRADA' ? 'badge-green' : 'badge-red'}`}>{record.status_display}</span>{record.mensagem_sefaz && <small style={{ display: 'block', color: 'var(--text-muted)' }}>{record.mensagem_sefaz}</small>}</td><td>{record.protocolo || '—'}</td><td>{record.pode_baixar_xml && <button className="btn btn-ghost btn-sm" onClick={() => downloadCorrectionXml(record)}><Download size={14} />XML</button>}</td></tr>)}</tbody></table></div></div> : null}

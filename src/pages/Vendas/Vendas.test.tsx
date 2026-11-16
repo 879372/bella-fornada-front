@@ -1,11 +1,12 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Vendas from './Vendas';
 
 const { get, post } = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
+const sale = { id: 7, status: 'FINALIZADA', total: '15.00', data: '2026-11-16T12:00:00Z', itens: [], pagamentos: [] };
 vi.mock('../../lib/api', () => ({ default: { get, post } }));
 vi.mock('../../hooks/useIsMobile', () => ({ useIsMobile: () => false }));
 vi.mock('../../hooks/usePaginatedList', () => ({ usePaginatedList: () => ({
@@ -16,7 +17,8 @@ vi.mock('../../hooks/usePaginatedList', () => ({ usePaginatedList: () => ({
 describe('Histórico único e emissão nos detalhes', () => {
   beforeEach(() => {
     post.mockReset(); get.mockReset();
-    get.mockImplementation(async (url: string) => url.includes('vendas-elegiveis')
+    get.mockImplementation(async (url: string) => /^\/vendas\/\d+\/$/.test(url)
+      ? { data: { ...sale, id: Number(url.split('/')[2]) } } : url.includes('vendas-elegiveis')
       ? { data: { count: 1, results: [{ id: 7 }] } }
       : { data: { total: { quantidade: 51, valor: '765.00' } } });
     post.mockResolvedValue({ data: { status: 'AUTORIZADA' } });
@@ -36,5 +38,17 @@ describe('Histórico único e emissão nos detalhes', () => {
     const confirmation = screen.getByRole('dialog', { name: 'Confirmar emissão de nota fiscal' });
     await user.click(within(confirmation).getByRole('button', { name: 'Emitir nota' }));
     expect(post).toHaveBeenCalledExactlyOnceWith('/fiscal/documentos/emitir/', { venda: 7, tipo: 'NFCE', canal: 'PDV' });
+  });
+
+  it('abre a venda vinculada fora da página visível e leva às notas dessa venda', async () => {
+    const user = userEvent.setup();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    function Location() { const location = useLocation(); return <output>{location.pathname}{location.search}</output>; }
+    render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/vendas?venda=99']}><Vendas /><Location /></MemoryRouter></QueryClientProvider>);
+    const modal = await screen.findByRole('dialog', { name: 'Venda #99' });
+    expect(get).toHaveBeenCalledWith('/vendas/99/');
+    await user.click(within(modal).getByRole('button', { name: 'Ver notas fiscais da venda' }));
+    expect(screen.getByText('/fiscal?venda=99')).toBeInTheDocument();
+    expect(post).not.toHaveBeenCalled();
   });
 });

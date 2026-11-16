@@ -16,7 +16,7 @@ import {
 import { cupomDaVenda } from '../../lib/cupom';
 import { imprimirCupom } from '../../lib/impressao';
 import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import ConfirmModal from '../../components/ConfirmModal';
 import Modal from '../../components/Modal';
 import TotalsCards, { type Totals } from '../../components/TotalsCards';
@@ -73,7 +73,23 @@ export default function Vendas() {
   // Sem data por padrão: mostra todas as vendas (a API já ordena das mais recentes).
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [issueConfirmation, setIssueConfirmation] = useState<{ venda: number; tipo: FiscalType } | null>(null);
-  const [selectedVenda, setSelectedVenda] = useState<Venda | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const saleId = searchParams.get('venda');
+  const validSaleId = /^[1-9]\d*$/.test(saleId || '');
+  const saleDetails = useQuery<Venda>({
+    queryKey: ['vendas', 'detalhe', saleId],
+    enabled: validSaleId,
+    queryFn: async () => (await api.get(`/vendas/${saleId}/`)).data,
+  });
+  const selectedVenda = validSaleId ? saleDetails.data : undefined;
+  const setSelectedVenda = (sale: Venda | null) => {
+    setSearchParams(current => {
+      const next = new URLSearchParams(current);
+      if (sale) next.set('venda', String(sale.id));
+      else next.delete('venda');
+      return next;
+    }, { replace: !sale, preventScrollReset: true });
+  };
   const [vendaParaCancelar, setVendaParaCancelar] = useState<{ id: number, justificativa?: string } | null>(null);
 
   const lista = usePaginatedList<Venda>(
@@ -189,6 +205,11 @@ export default function Vendas() {
         { label: 'Canceladas', totals: totals.data?.canceladas },
       ]} />
       <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Valores líquidos de desconto, considerando todos os registros dos filtros abaixo. Canceladas não compõem o total de finalizadas.</p>
+
+      {saleId && (saleDetails.isLoading || saleDetails.isError || !validSaleId) && <div className="card" style={{ padding: 16, marginBottom: 20 }} role="status">
+        {saleDetails.isLoading ? 'Carregando detalhes da venda...' : 'Não foi possível abrir esta venda. Ela pode estar indisponível ou você não possui acesso.'}
+        {!saleDetails.isLoading && <button className="btn btn-ghost btn-sm" onClick={() => setSelectedVenda(null)}>Voltar ao histórico</button>}
+      </div>}
 
       {/* FILTROS */}
       <div className="card filter-card" style={{ marginBottom: 24, padding: '16px 24px' }}>
@@ -369,7 +390,7 @@ export default function Vendas() {
             </div>
 
             <div className="sale-detail-body" style={{ padding: '32px', maxHeight: '70vh', overflowY: 'auto' }}>
-               {selectedVenda.status === 'FINALIZADA' && <section style={{ marginBottom: 24 }} aria-label="Nota fiscal da venda">
+               {selectedVenda.status !== 'EM_ABERTO' && <section style={{ marginBottom: 24 }} aria-label="Nota fiscal da venda">
                  <h3 style={{ marginBottom: 10 }}>Nota fiscal</h3>
                  {eligible.isLoading ? <p>Consultando situação fiscal...</p> : eligible.isError ? <p>Não foi possível consultar a emissão. <button className="btn btn-ghost btn-sm" onClick={() => eligible.refetch()}>Tentar novamente</button></p> : canIssue ? <>
                    <p style={{ color: 'var(--text-muted)' }}>NFC-e para consumidor final; NF-e exige cliente e endereço fiscal completos.</p>
@@ -378,8 +399,9 @@ export default function Vendas() {
                      <button className="btn btn-ghost" disabled={emitirDocumento.isPending || !selectedVenda.cliente_nome} onClick={() => setIssueConfirmation({ venda: selectedVenda.id, tipo: 'NFE' })}><FileText size={16} />Emitir NF-e</button>
                    </div>
                  </> : <p style={{ color: 'var(--text-muted)' }}>Esta venda não está disponível para uma nova emissão. Consulte o documento e suas opções em Notas fiscais.</p>}
-                 <button className="btn btn-ghost btn-sm" onClick={() => navigate('/fiscal')}>Consultar notas fiscais</button>
+                 <button className="btn btn-ghost btn-sm" onClick={() => navigate(`/fiscal?venda=${selectedVenda.id}`)}>Ver notas fiscais da venda</button>
                </section>}
+               {selectedVenda.status === 'EM_ABERTO' && <Link className="btn btn-ghost btn-sm" to={`/fiscal?venda=${selectedVenda.id}`} style={{ marginBottom: 20 }}>Ver notas fiscais da venda</Link>}
                <div style={{ marginBottom: 32 }}>
                   <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 16 }}>Itens da Venda</h3>
                   <div className="stack-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
