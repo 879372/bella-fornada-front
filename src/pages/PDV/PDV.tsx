@@ -206,6 +206,13 @@ export default function PDV() {
     setTimeout(() => valorPagoRef.current?.focus(), 100);
   }, [carrinho.length, desconto, valorRestante]);
 
+  const fecharPagamento = useCallback(() => {
+    setShowPagamento(false);
+    setShowClienteDropdown(false);
+    setActiveTab('search');
+    window.setTimeout(() => buscaRef.current?.focus(), 0);
+  }, []);
+
   useEffect(() => {
     if (showPagamento) {
       // Mantém apenas a sugestão do próximo pagamento sincronizada; os
@@ -810,12 +817,12 @@ export default function PDV() {
         {/* BUSCA DE PRODUTOS */}
         <section className={`pdv-search-column ${activeTab === 'search' ? 'active' : ''}`}>
            <div style={{ position: 'relative', marginBottom: 16 }}>
-              <Search size={18} style={{ position: 'absolute', left: 12, top: 12, color: 'var(--text-muted)' }} />
+              <Search size={20} style={{ position: 'absolute', left: 14, top: 15, color: 'var(--text-muted)' }} />
               <input
                 ref={buscaRef}
                 className="input"
                 placeholder="Buscar produto... (F3)"
-                style={{ height: 44, paddingLeft: 40, fontSize: '0.95rem', borderRadius: 10 }}
+                style={{ height: 50, paddingLeft: 46, fontSize: '1.08rem', borderRadius: 10, fontWeight: 600 }}
                 value={busca}
                 onChange={e => handleBusca(e.target.value)}
                 onKeyDown={e => {
@@ -844,7 +851,7 @@ export default function PDV() {
                       role="button"
                       tabIndex={0}
                       style={{
-                        padding: '10px 14px',
+                        padding: '13px 16px',
                         cursor: 'pointer',
                         display: 'flex',
                         justifyContent: 'space-between',
@@ -861,15 +868,15 @@ export default function PDV() {
                       }}
                     >
                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 700, fontSize: '0.9rem', lineHeight: 1.2 }}>{p.nome}</div>
-                          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{p.unidade_medida || 'UN'} · {p.codigo_legado || ''}</div>
+                          <div style={{ fontWeight: 750, fontSize: '1.02rem', lineHeight: 1.25 }}>{p.nome}</div>
+                          <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: 3 }}>{p.unidade_medida || 'UN'} · {p.codigo_legado || ''}</div>
                        </div>
                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--accent-green)' }}>R$ {Number(p.preco_venda).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                          <div style={{ fontSize: '1.16rem', fontWeight: 850, color: 'var(--accent-green)' }}>R$ {Number(p.preco_venda).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
                           {productAddingId === p.id ? (
                             <Loader2 size={16} className="animate-spin text-accent" />
                           ) : (
-                            <div style={{ fontSize: '0.65rem', color: 'var(--accent)', fontWeight: 700 }}>+ ADICIONAR</div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: 750 }}>+ ADICIONAR</div>
                           )}
                        </div>
                     </div>
@@ -892,7 +899,7 @@ export default function PDV() {
         <section className={`pdv-cart-column ${activeTab === 'cart' ? 'active' : ''}`}>
            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                 <h3 style={{ fontSize: '0.9rem', fontWeight: 800 }}>CARRINHO</h3>
+                 <h3 style={{ fontSize: '1.02rem', fontWeight: 850 }}>CARRINHO</h3>
                  <span className="badge badge-blue">{carrinho.length} ITENS</span>
               </div>
 
@@ -903,11 +910,11 @@ export default function PDV() {
                     </div>
                  ) : (
                     carrinho.map((item, idx) => (
-                       <div key={idx} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                       <div key={idx} style={{ padding: '13px 0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <div style={{ flex: 1 }}>
                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <span style={{
-                                  fontSize: '0.6rem', fontWeight: 800,
+                                  fontSize: '0.68rem', fontWeight: 800,
                                   background: 'rgba(99,102,241,0.15)',
                                   color: 'var(--accent)',
                                   borderRadius: 4, padding: '1px 5px',
@@ -915,12 +922,12 @@ export default function PDV() {
                                   letterSpacing: '0.5px',
                                   flexShrink: 0
                                 }}>#{idx + 1}</span>
-                                <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>{item.nome}</span>
+                                <span style={{ fontSize: '0.98rem', fontWeight: 750, lineHeight: 1.25 }}>{item.nome}</span>
                              </div>
-                             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: 28 }}>{item.quantidade} x R$ {item.preco_unitario.toFixed(2)}</div>
+                             <div style={{ fontSize: '0.84rem', color: 'var(--text-muted)', marginLeft: 28, marginTop: 3 }}>{item.quantidade} x R$ {item.preco_unitario.toFixed(2)}</div>
                           </div>
                           <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: 8 }}>
-                             <div style={{ fontSize: '0.85rem', fontWeight: 800 }}>R$ {item.subtotal.toFixed(2)}</div>
+                             <div style={{ fontSize: '1rem', fontWeight: 850 }}>R$ {item.subtotal.toFixed(2)}</div>
                              <button
                                 type="button"
                                 className="pdv-item-action"
@@ -947,8 +954,8 @@ export default function PDV() {
 
               <div style={{ marginTop: 16, paddingTop: 16, borderTop: '2px dashed var(--border)' }}>
                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>TOTAL</span>
-                    <span style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--accent-green)', letterSpacing: '-1px' }}>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 750, color: 'var(--text-muted)' }}>TOTAL</span>
+                    <span style={{ fontSize: '2.25rem', fontWeight: 900, color: 'var(--accent-green)', letterSpacing: '-1px' }}>
                       R$ {total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
                  </div>
@@ -956,7 +963,7 @@ export default function PDV() {
                  <div style={{ display: 'flex', gap: 8 }}>
                     <button
                        className="btn btn-primary"
-                       style={{ flex: 1, height: 56, fontSize: '1rem', fontWeight: 800 }}
+                       style={{ flex: 1, height: 60, fontSize: '1.08rem', fontWeight: 850 }}
                        onClick={() => {
                          if (isMobile && activeTab === 'search') {
                             setActiveTab('cart');
@@ -994,14 +1001,14 @@ export default function PDV() {
       {/* MODAL DE PAGAMENTO */}
       {showPagamento && (
         <Modal
-          onClose={() => setShowPagamento(false)}
+          onClose={fecharPagamento}
           labelledBy="pdv-payment-title"
           overlayClassName="pdv-payment-overlay"
           panelClassName="card animate-in modal-panel modal-panel-lg pdv-payment-modal"
         >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
                <h2 id="pdv-payment-title" style={{ fontSize: '1.5rem', fontWeight: 900 }}>Finalização de Venda</h2>
-               <button onClick={() => setShowPagamento(false)} className="btn-icon" aria-label="Fechar pagamento"><X size={24} /></button>
+               <button onClick={fecharPagamento} className="btn-icon" aria-label="Fechar pagamento"><X size={24} /></button>
             </div>
 
             <div className="pdv-payment-grid">
