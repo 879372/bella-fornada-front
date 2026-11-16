@@ -6,7 +6,15 @@
 import { CupomDados, FORMAS, LOJA, moeda } from './cupom';
 
 export async function imprimirCupom(dados: CupomDados) {
-  await imprimirPeloSistema(montarCupomHtml(dados));
+  await imprimirPeloSistema({ html: montarCupomHtml(dados) });
+}
+
+/** Aciona a impressão do PDF fiscal no próprio navegador, sem abrir outra aba. */
+export async function imprimirPdf(pdf: Blob) {
+  if (!pdf.size || pdf.type !== 'application/pdf') {
+    throw new Error('O PDF fiscal recebido está vazio ou em formato inválido.');
+  }
+  await imprimirPeloSistema({ pdf });
 }
 
 const escapar = (texto: unknown) => String(texto ?? '')
@@ -113,30 +121,48 @@ export function montarCupomHtml(dados: CupomDados): string {
  * Imprime o HTML num iframe oculto, sem trocar de página. O diálogo de
  * impressão só não aparece quando o Chrome é aberto com --kiosk-printing.
  */
-function imprimirPeloSistema(html: string) {
+function imprimirPeloSistema(conteudo: { html: string } | { pdf: Blob }) {
   return new Promise<void>((resolve, reject) => {
     const iframe = document.createElement('iframe');
     iframe.setAttribute('aria-hidden', 'true');
-    iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
-
-    const remover = () => setTimeout(() => iframe.remove(), 1000);
+    // O visualizador nativo de PDF precisa de um frame renderizado, mesmo fora da tela.
+    iframe.style.cssText = 'position:fixed;left:-10000px;top:0;width:800px;height:600px;border:0;';
+    const url = 'pdf' in conteudo ? URL.createObjectURL(conteudo.pdf) : null;
+    let cleanupTimer: ReturnType<typeof setTimeout> | undefined;
+    let removed = false;
+    const cleanup = () => {
+      if (removed) return;
+      removed = true;
+      clearTimeout(loadTimer);
+      clearTimeout(cleanupTimer);
+      iframe.remove();
+      if (url) URL.revokeObjectURL(url);
+    };
+    const fail = (message: string) => { cleanup(); reject(new Error(message)); };
+    const loadTimer = setTimeout(() => fail('O documento demorou para carregar. Tente imprimir novamente.'), 30_000);
 
     iframe.onload = () => {
+      iframe.onload = null;
+      clearTimeout(loadTimer);
       const janela = iframe.contentWindow;
       if (!janela) {
-        iframe.remove();
-        reject(new Error('Não foi possível preparar a impressão.'));
+        fail('Não foi possível preparar a impressão.');
         return;
       }
-      janela.addEventListener('afterprint', remover, { once: true });
-      janela.focus();
-      janela.print();
-      // Fallback caso o navegador não dispare afterprint.
-      setTimeout(() => iframe.isConnected && iframe.remove(), 60_000);
-      resolve();
+      try {
+        janela.addEventListener('afterprint', () => { cleanupTimer = setTimeout(cleanup, 1000); }, { once: true });
+        janela.focus();
+        janela.print();
+        // Mantém o PDF disponível enquanto o navegador prepara a impressão.
+        cleanupTimer = setTimeout(cleanup, 60_000);
+        resolve();
+      } catch {
+        fail('Não foi possível acionar a impressão. Tente novamente.');
+      }
     };
-
-    iframe.srcdoc = html;
+    iframe.onerror = () => fail('Não foi possível carregar o documento para impressão.');
+    if ('html' in conteudo) iframe.srcdoc = conteudo.html;
+    else iframe.src = url!;
     document.body.appendChild(iframe);
   });
 }

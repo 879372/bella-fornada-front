@@ -27,6 +27,7 @@ describe('montarCupomHtml', () => {
     }));
 
     expect(html).toContain('DAV N°.: 33586');
+    expect(html).toContain('Não tem valor fiscal');
     expect(html).toContain('FOSFORO OLHO CAIXA');
     expect(html).toContain('<span>Dinheiro</span><span>R$ 20,00</span>');
     expect(html).toContain('<span>TROCO R$.:</span><span>R$ 15,00</span>');

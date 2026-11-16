@@ -23,7 +23,7 @@ import {
   Printer
 } from 'lucide-react';
 import { cupomDaVenda, CupomDados } from '../../lib/cupom';
-import { imprimirCupom } from '../../lib/impressao';
+import { imprimirVenda } from '../../lib/impressaoVenda';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Produto, ItemCarrinho, Sessao, Venda, Pagamento } from './types';
 import CashOpsModal from './CashOpsModal';
@@ -194,6 +194,7 @@ export default function PDV() {
   // Impressão de comprovante
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printData, setPrintData] = useState<CupomDados | null>(null);
+  const [isPrinting, setIsPrinting] = useState(false);
   const [documentoFiscal, setDocumentoFiscal] = useState<DocumentoFiscalPdv | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Produto | null>(null);
@@ -452,25 +453,14 @@ export default function PDV() {
 
   // Handlers
   const handleImprimir = async () => {
-    if (!printData) return;
-
+    if (!printData || isPrinting) return;
+    setIsPrinting(true);
     try {
-      await imprimirCupom(printData);
+      await imprimirVenda(printData);
     } catch (error: any) {
-      console.error(error);
-      toast.error(error?.message || 'Erro ao imprimir o cupom.');
-    }
-  };
-
-  const handleAbrirDanfce = async () => {
-    if (!documentoFiscal?.pode_baixar_pdf) return;
-    try {
-      const response = await api.get(`/fiscal/documentos/${documentoFiscal.id}/pdf/`, { responseType: 'blob' });
-      const url = URL.createObjectURL(response.data);
-      window.open(url, '_blank', 'noopener,noreferrer');
-      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch {
-      toast.error('Não foi possível abrir o DANFC-e.');
+      toast.error(error?.response?.data?.detail || error?.message || 'Não foi possível imprimir a venda. Tente novamente.');
+    } finally {
+      setIsPrinting(false);
     }
   };
 
@@ -1421,6 +1411,7 @@ export default function PDV() {
       {showPrintModal && (
         <Modal
           onClose={() => { setShowPrintModal(false); setPrintData(null); setDocumentoFiscal(null); }}
+          isBusy={isPrinting}
           labelledBy="print-sale-title"
           describedBy="print-sale-description"
           overlayClassName="modal-overlay-raised"
@@ -1434,20 +1425,20 @@ export default function PDV() {
              <h3 id="print-sale-title" style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: 12 }}>{documentoFiscal?.status === 'AUTORIZADA' ? 'Venda concluída e NFC-e autorizada!' : 'Venda Concluída!'}</h3>
              <p id="print-sale-description" style={{ color: 'var(--text-secondary)', marginBottom: 24, fontSize: '0.9rem' }}>
                {documentoFiscal?.status === 'AUTORIZADA'
-                 ? `NFC-e nº ${documentoFiscal.numero || 'autorizada'}. Você pode abrir o DANFC-e para impressão.`
-                 : 'Deseja imprimir o comprovante desta venda?'}
+                 ? `NFC-e nº ${documentoFiscal.numero || 'autorizada'}. A impressão usará o DANFC-e disponível; caso contrário, o comprovante sem valor fiscal.`
+                 : 'A impressão usará o documento fiscal disponível ou o comprovante sem valor fiscal.'}
              </p>
              <div style={{ display: 'flex', gap: 10 }}>
-               <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => {
+               <button className="btn btn-ghost" style={{ flex: 1 }} disabled={isPrinting} onClick={() => {
                  setShowPrintModal(false);
                  setPrintData(null);
                  setDocumentoFiscal(null);
                }}>
                  Fechar
                </button>
-               <button className="btn btn-primary" style={{ flex: 1, background: '#10b981' }} onClick={documentoFiscal?.pode_baixar_pdf ? handleAbrirDanfce : handleImprimir} autoFocus>
+               <button className="btn btn-primary" style={{ flex: 1, background: '#10b981' }} onClick={handleImprimir} disabled={isPrinting} autoFocus>
                  <Printer size={18} />
-                 {documentoFiscal?.pode_baixar_pdf ? 'Abrir DANFC-e' : 'Imprimir'}
+                 {isPrinting ? 'Preparando impressão...' : 'Imprimir'}
                </button>
              </div>
         </Modal>

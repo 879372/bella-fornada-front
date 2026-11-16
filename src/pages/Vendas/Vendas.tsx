@@ -16,7 +16,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { cupomDaVenda } from '../../lib/cupom';
-import { imprimirCupom } from '../../lib/impressao';
+import { imprimirVenda } from '../../lib/impressaoVenda';
 import { toast } from 'sonner';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import ConfirmModal from '../../components/ConfirmModal';
@@ -73,6 +73,7 @@ export default function Vendas() {
   const [statusFilter, setStatusFilter] = useState('');
   // Sem data por padrão: mostra todas as vendas (a API já ordena das mais recentes).
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const [isPrinting, setIsPrinting] = useState(false);
   const [issueConfirmation, setIssueConfirmation] = useState<{ venda: number; tipo: FiscalType } | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const saleId = searchParams.get('venda');
@@ -173,11 +174,14 @@ export default function Vendas() {
   });
 
   const handleImprimir = async (venda: Venda) => {
+    if (isPrinting) return;
+    setIsPrinting(true);
     try {
-      await imprimirCupom(cupomDaVenda(venda));
+      await imprimirVenda(cupomDaVenda(venda));
     } catch (error: any) {
-      console.error(error);
-      toast.error(error?.message || 'Erro ao imprimir o cupom.');
+      toast.error(error?.response?.data?.detail || error?.message || 'Não foi possível imprimir a venda. Tente novamente.');
+    } finally {
+      setIsPrinting(false);
     }
   };
 
@@ -423,10 +427,11 @@ export default function Vendas() {
                     <button
                       className="btn btn-ghost"
                       style={{ color: 'var(--accent-green)', background: 'rgba(16, 185, 129, 0.1)' }}
+                      disabled={isPrinting}
                       onClick={() => handleImprimir(selectedVenda)}
                     >
                       <Printer size={16} />
-                      Reimprimir
+                      {isPrinting ? 'Preparando impressão...' : 'Reimprimir'}
                     </button>
 
                     <button

@@ -5,9 +5,10 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Vendas from './Vendas';
 
-const { get, post, list, setPage } = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), list: vi.fn(), setPage: vi.fn() }));
+const { get, post, list, setPage, printSale } = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), list: vi.fn(), setPage: vi.fn(), printSale: vi.fn() }));
 const sale = { id: 7, status: 'FINALIZADA', total: '15.00', data: '2026-11-16T12:00:00Z', itens: [], pagamentos: [] };
 vi.mock('../../lib/api', () => ({ default: { get, post } }));
+vi.mock('../../lib/impressaoVenda', () => ({ imprimirVenda: printSale }));
 vi.mock('../../hooks/useIsMobile', () => ({ useIsMobile: () => false }));
 vi.mock('../../hooks/usePaginatedList', () => ({ usePaginatedList: list }));
 
@@ -15,6 +16,7 @@ describe('Histórico único e emissão nos detalhes', () => {
   beforeEach(() => {
     post.mockReset(); get.mockReset();
     list.mockReset(); setPage.mockReset();
+    printSale.mockReset(); printSale.mockResolvedValue(undefined);
     list.mockReturnValue({ items: [sale], isLoading: false, page: 1, setPage, totalPages: 1, isMobile: false });
     get.mockImplementation(async (url: string) => /^\/vendas\/\d+\/$/.test(url)
       ? { data: { ...sale, id: Number(url.split('/')[2]) } } : url.includes('vendas-elegiveis')
@@ -76,5 +78,13 @@ describe('Histórico único e emissão nos detalhes', () => {
     expect(screen.getByLabelText('Data final')).toHaveValue('');
     expect(screen.getByLabelText('Status da venda')).toHaveValue('');
     expect(setPage).toHaveBeenCalledWith(1);
+  });
+
+  it('usa a seleção automática do documento ao reimprimir uma venda', async () => {
+    const user = userEvent.setup();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/vendas?venda=7']}><Vendas /></MemoryRouter></QueryClientProvider>);
+    await user.click(await screen.findByRole('button', { name: 'Reimprimir' }));
+    expect(printSale).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ numero: 7, total: 15 }));
   });
 });
