@@ -304,7 +304,7 @@ export default function PDV() {
       if (resumeVendaId) {
         try {
           const { data } = await api.get(`/vendas/${resumeVendaId}/`);
-          return data;
+          if (data.status === 'EM_ABERTO' && String(data.sessao) === String(sessao.id)) return data;
         } catch {
           toast.error('Não foi possível carregar a venda solicitada.');
         }
@@ -343,11 +343,22 @@ export default function PDV() {
   });
 
   const fecharCaixaMutation = useMutation({
-    mutationFn: (valor: number) => api.post(`/sessoes-caixa/${sessao?.id}/fechar/`, { valor_contado: valor }),
+    mutationFn: async (valor: number) => {
+      await filaAdicaoRef.current;
+      return api.post(`/sessoes-caixa/${sessao?.id}/fechar/`, { valor_contado: valor });
+    },
     onSuccess: () => {
       toast.success('Caixa fechado com sucesso!');
       setModalFecharCaixaOpen(false);
       setValorContado('');
+      vendaRef.current = null;
+      queryClient.setQueriesData({ queryKey: ['venda-aberta'] }, null);
+      void queryClient.invalidateQueries({ queryKey: ['fechamentos'] });
+      void queryClient.invalidateQueries({ queryKey: ['fechamentos-vendas'] });
+      void queryClient.invalidateQueries({ queryKey: ['vendas'] });
+      setPagamentosRealizados([]);
+      setDesconto(0);
+      if (resumeVendaId) navigate('/pdv', { replace: true });
       queryClient.invalidateQueries({ queryKey: ['sessao-ativa'] });
       setCarrinho([]);
       setVenda(null);
@@ -355,6 +366,37 @@ export default function PDV() {
     onError: (err: any) => {
       toast.error(err.response?.data?.erro || 'Erro ao fechar o caixa.');
     }
+  });
+
+  const cancelarVendaMutation = useMutation({
+    mutationFn: async () => {
+      await filaAdicaoRef.current;
+      const atual = vendaRef.current;
+      if (atual) await api.post(`/vendas/${atual.id}/cancelar/`, { motivo: 'Cancelamento solicitado no PDV.' });
+    },
+    onSuccess: () => {
+      vendaRef.current = null;
+      setCarrinho([]);
+      setVenda(null);
+      setPagamentosRealizados([]);
+      setBuscaCliente('Consumidor Final');
+      setClienteId(null);
+      setDesconto(0);
+      setTipoDesconto('VALOR');
+      setModalCancelarVendaOpen(false);
+      setActiveTab('search');
+      queryClient.setQueriesData({ queryKey: ['venda-aberta'] }, null);
+      void queryClient.invalidateQueries({ queryKey: ['venda-aberta'] });
+      void queryClient.invalidateQueries({ queryKey: ['vendas'] });
+      void queryClient.invalidateQueries({ queryKey: ['fechamentos'] });
+      void queryClient.invalidateQueries({ queryKey: ['fechamentos-vendas'] });
+      if (resumeVendaId) navigate('/pdv', { replace: true });
+      buscaRef.current?.focus();
+      toast.success('Venda cancelada.');
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.erro || err.response?.data?.detail || 'Não foi possível cancelar a venda. Tente novamente.');
+    },
   });
 
   const removerItemMutation = useMutation({
@@ -1337,6 +1379,7 @@ export default function PDV() {
       {modalFecharCaixaOpen && (
         <Modal
           onClose={() => setModalFecharCaixaOpen(false)}
+          isBusy={fecharCaixaMutation.isPending}
           labelledBy="cash-closing-title"
           describedBy="cash-closing-description"
           panelClassName="modal-content modal-panel-sm"
@@ -1344,9 +1387,9 @@ export default function PDV() {
             <div className="modal-header">
               <div>
                 <h2 id="cash-closing-title" className="modal-title">Fechar caixa</h2>
-                <p id="cash-closing-description" className="modal-subtitle">Faça a conferência do dinheiro físico antes de encerrar.</p>
+                <p id="cash-closing-description" className="modal-subtitle">Confira o dinheiro físico. Ao confirmar, todas as vendas em aberto deste caixa serão canceladas automaticamente antes de encerrar.</p>
               </div>
-              <button className="btn-icon" onClick={() => setModalFecharCaixaOpen(false)} aria-label="Fechar modal">
+              <button className="btn-icon" onClick={() => setModalFecharCaixaOpen(false)} disabled={fecharCaixaMutation.isPending} aria-label="Fechar modal">
                 <X size={20} />
               </button>
             </div>
@@ -1356,15 +1399,15 @@ export default function PDV() {
             </div>
             <div className="form-group">
               <label className="form-label" htmlFor="cash-closing-value">Valor contado no caixa (R$) *</label>
-              <input id="cash-closing-value" className="input input-emphasis" type="number" min="0" step="0.01" autoFocus value={valorContado} onChange={e => setValorContado(e.target.value)} placeholder="0,00" />
+              <input id="cash-closing-value" className="input input-emphasis" type="number" min="0" step="0.01" autoFocus disabled={fecharCaixaMutation.isPending} value={valorContado} onChange={e => setValorContado(e.target.value)} placeholder="0,00" />
               {valorContado !== '' && <p className="field-hint">Diferença: <strong className={Number(valorContado) - Number(sessao.saldo_final_calculado || 0) === 0 ? 'text-success' : 'text-danger'}>R$ {(Number(valorContado) - Number(sessao.saldo_final_calculado || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></p>}
             </div>
             <div className="modal-footer">
-              <button className="btn btn-ghost" onClick={() => setModalFecharCaixaOpen(false)}>Cancelar</button>
+              <button className="btn btn-ghost" disabled={fecharCaixaMutation.isPending} onClick={() => setModalFecharCaixaOpen(false)}>Cancelar</button>
               <button
                 className="btn btn-danger"
                 onClick={() => fecharCaixaMutation.mutate(Number(valorContado))}
-                disabled={valorContado === '' || Number(valorContado) < 0 || fecharCaixaMutation.isPending}
+                disabled={valorContado === '' || !Number.isFinite(Number(valorContado)) || Number(valorContado) < 0 || fecharCaixaMutation.isPending}
               >
                 {fecharCaixaMutation.isPending ? 'Fechando...' : 'Conferir e fechar'}
               </button>
@@ -1375,6 +1418,7 @@ export default function PDV() {
       {modalCancelarVendaOpen && (
         <Modal
           onClose={() => setModalCancelarVendaOpen(false)}
+          isBusy={cancelarVendaMutation.isPending}
           labelledBy="cancel-sale-title"
           describedBy="cancel-sale-description"
           panelClassName="modal-content modal-panel-sm modal-text-center"
@@ -1386,23 +1430,14 @@ export default function PDV() {
              </div>
              <h3 id="cancel-sale-title" style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: 12 }}>Cancelar Venda?</h3>
              <p id="cancel-sale-description" style={{ color: 'var(--text-secondary)', marginBottom: 24, fontSize: '0.9rem' }}>
-               A venda atual será descartada e todos os itens serão removidos. Esta ação não pode ser desfeita.
+               A venda atual será cancelada no sistema e o carrinho será limpo após a confirmação do servidor. Esta ação não pode ser desfeita.
              </p>
              <div style={{ display: 'flex', gap: 10 }}>
-               <button data-modal-initial-focus className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setModalCancelarVendaOpen(false)}>
+               <button data-modal-initial-focus className="btn btn-ghost" style={{ flex: 1 }} disabled={cancelarVendaMutation.isPending} onClick={() => setModalCancelarVendaOpen(false)}>
                  Voltar
                </button>
-               <button className="btn btn-primary" style={{ flex: 1, background: 'var(--accent-red)' }} onClick={() => {
-                 setCarrinho([]);
-                 setVenda(null);
-                 setPagamentosRealizados([]);
-                 setBuscaCliente('Consumidor Final');
-                 setClienteId(null);
-                 setModalCancelarVendaOpen(false);
-                 setActiveTab('search');
-                 buscaRef.current?.focus();
-               }}>
-                 Sim, Cancelar
+               <button className="btn btn-primary" style={{ flex: 1, background: 'var(--accent-red)' }} onClick={() => cancelarVendaMutation.mutate()} disabled={cancelarVendaMutation.isPending}>
+                 {cancelarVendaMutation.isPending ? 'Cancelando...' : 'Sim, Cancelar'}
                </button>
              </div>
         </Modal>

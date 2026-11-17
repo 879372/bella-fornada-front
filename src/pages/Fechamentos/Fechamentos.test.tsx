@@ -19,7 +19,7 @@ beforeEach(() => {
     { id: 10, data: '2026-11-17T11:00:00Z', cliente_nome: null, status: 'CANCELADA', total: '50', desconto: '0', pagamentos: [] },
   ] : [
     { id: 1, operador: 1, operador_nome: 'Ana', status: 'FECHADA', aberta_em: '2026-11-17T08:00:00Z', fechada_em: '2026-11-17T18:00:00Z', fundo_inicial: '100', valor_contado: '115', diferenca_caixa: '-5', observacoes: '', resumo },
-    { id: 2, operador: 2, operador_nome: 'Pedro', status: 'ABERTA', aberta_em: '2026-11-17T08:00:00Z', fechada_em: null, fundo_inicial: '100', valor_contado: null, diferenca_caixa: null, observacoes: '', resumo },
+    { id: 2, operador: 2, operador_nome: 'Pedro', status: 'ABERTA', aberta_em: '2026-11-17T08:00:00Z', fechada_em: null, fundo_inicial: '100', valor_contado: null, diferenca_caixa: null, observacoes: '', resumo: { ...resumo, quantidade_abertas: 1 } },
   ] as never);
 });
 const montar = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><MemoryRouter><Fechamentos /></MemoryRouter></QueryClientProvider>);
@@ -48,6 +48,7 @@ it('fecha o próprio caixa somente após conferir e confirmar o valor contado', 
   fireEvent.click((await screen.findAllByRole('button', { name: 'Ver vendas e detalhes' }))[1]);
   fireEvent.click(screen.getByRole('button', { name: 'Fechar este caixa' }));
   const modal = screen.getByRole('dialog');
+  expect(within(modal).getByText(/todas as vendas em aberto desta sessão serão canceladas automaticamente/)).toBeInTheDocument();
   expect(within(modal).getByRole('button', { name: 'Confirmar fechamento' })).toBeDisabled();
   expect(api.post).not.toHaveBeenCalled();
   fireEvent.change(within(modal).getByLabelText('Valor contado em dinheiro (R$)'), { target: { value: '115.00' } });
