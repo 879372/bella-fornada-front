@@ -1,0 +1,23 @@
+.closings-page { display: grid; gap: 20px; }
+.closings-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.closings-filters { display: grid; grid-template-columns: repeat(3, minmax(140px, 1fr)) minmax(220px, 1.5fr); gap: 16px; padding: 20px; }
+.closings-filters label { display: grid; gap: 8px; font-size: .85rem; color: var(--text-secondary); }
+.closings-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.closings-kpis .card { padding: 20px; }
+.closings-kpis strong { display: block; font-size: 1.6rem; margin: 10px 0; }
+.closings-kpis small, .closings-page small { color: var(--text-muted); display: block; }
+.closings-section { padding: 24px; min-width: 0; }
+.closings-section h2 { display: flex; align-items: center; gap: 8px; font-size: 1.15rem; margin-bottom: 10px; }
+.closings-section h3 { margin: 28px 0 16px; }
+.closings-section > p { margin: 10px 0 20px; }
+.closings-payments { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-top: 20px; }
+.closings-payments > div { padding: 16px; border: 1px solid var(--border); border-radius: 12px; }
+.closings-payments strong { display: block; margin: 8px 0; font-size: 1.15rem; }
+.closings-table { white-space: nowrap; }
+.closings-table small { margin-top: 6px; }
+.closing-selected { background: var(--bg-body); }
+.closings-detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; padding: 20px 0; }
+.closings-detail-grid span { display: block; color: var(--text-muted); font-size: .8rem; margin-bottom: 7px; }
+.closings-sale-filters { grid-template-columns: 2fr 1fr; padding: 0; margin-bottom: 16px; }
+@media (max-width: 1000px) { .closings-filters, .closings-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .closings-payments { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .closings-filters, .closings-sale-filters { grid-template-columns: 1fr; } .closings-payments { grid-template-columns: repeat(2, minmax(0, 1fr)); } .closings-section { padding: 16px; } .closings-kpis strong { font-size: 1.2rem; } }

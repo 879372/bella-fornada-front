@@ -14,6 +14,7 @@ const Clientes = lazy(() => import('./pages/Clientes/Clientes.tsx'));
 const PDV = lazy(() => import('./pages/PDV/PDV.tsx'));
 const Financeiro = lazy(() => import('./pages/Financeiro/Financeiro.tsx'));
 const Compras = lazy(() => import('./pages/Compras/Compras.tsx'));
+const Fechamentos = lazy(() => import('./pages/Fechamentos/Fechamentos.tsx'));
 const Relatorios = lazy(() => import('./pages/Relatorios/Relatorios.tsx'));
 const Vendas = lazy(() => import('./pages/Vendas/Vendas.tsx'));
 const Estoque = lazy(() => import('./pages/Estoque/Estoque.tsx'));
@@ -61,6 +62,7 @@ function App() {
           <Route path="clientes" element={<Clientes />} />
           <Route path="financeiro" element={<Financeiro />} />
           <Route path="compras" element={<Compras />} />
+          <Route path="fechamentos" element={<Fechamentos />} />
           <Route path="relatorios" element={<Relatorios />} />
           <Route path="vendas" element={<Vendas />} />
           <Route path="delivery" element={<Delivery />} />
