@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { cupomDaVenda, CupomDados } from '../../lib/cupom';
 import { imprimirVenda } from '../../lib/impressaoVenda';
+import { imprimirFechamento } from '../../lib/impressao';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Produto, ItemCarrinho, Sessao, Venda, Pagamento } from './types';
 import CashOpsModal from './CashOpsModal';
@@ -347,8 +348,13 @@ export default function PDV() {
       await filaAdicaoRef.current;
       return api.post(`/sessoes-caixa/${sessao?.id}/fechar/`, { valor_contado: valor });
     },
-    onSuccess: () => {
+    onSuccess: ({ data }) => {
       toast.success('Caixa fechado com sucesso!');
+      if (data?.relatorio) {
+        imprimirFechamento(data.relatorio).catch((error: Error) => {
+          toast.error(`${error.message || 'Não foi possível imprimir o fechamento.'} Reimprima pela tela Fechamento de caixa.`);
+        });
+      }
       setModalFecharCaixaOpen(false);
       setValorContado('');
       vendaRef.current = null;
@@ -1395,12 +1401,11 @@ export default function PDV() {
             </div>
             <div className="cash-closing-summary">
               <div><span>Fundo inicial</span><strong>R$ {Number(sessao.fundo_inicial || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></div>
-              <div><span>Saldo esperado em dinheiro</span><strong>R$ {Number(sessao.saldo_final_calculado || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></div>
             </div>
             <div className="form-group">
-              <label className="form-label" htmlFor="cash-closing-value">Valor contado no caixa (R$) *</label>
-              <input id="cash-closing-value" className="input input-emphasis" type="number" min="0" step="0.01" autoFocus disabled={fecharCaixaMutation.isPending} value={valorContado} onChange={e => setValorContado(e.target.value)} placeholder="0,00" />
-              {valorContado !== '' && <p className="field-hint">Diferença: <strong className={Number(valorContado) - Number(sessao.saldo_final_calculado || 0) === 0 ? 'text-success' : 'text-danger'}>R$ {(Number(valorContado) - Number(sessao.saldo_final_calculado || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></p>}
+              <label className="form-label" htmlFor="cash-closing-value">Dinheiro contado no caixa (R$) *</label>
+              <input id="cash-closing-value" className="input input-emphasis" type="number" min="0" step="0.01" required autoFocus disabled={fecharCaixaMutation.isPending} value={valorContado} onChange={e => setValorContado(e.target.value)} placeholder="Conte as notas e moedas" />
+              <p className="field-hint">Conte todo o dinheiro da gaveta, inclusive o fundo inicial. O valor esperado e a diferença saem só na impressão do fechamento.</p>
             </div>
             <div className="modal-footer">
               <button className="btn btn-ghost" disabled={fecharCaixaMutation.isPending} onClick={() => setModalFecharCaixaOpen(false)}>Cancelar</button>

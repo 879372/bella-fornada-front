@@ -26,7 +26,6 @@ export interface Sessao {
   total_vendas: string;
   total_sangrias: string;
   total_suprimentos: string;
-  saldo_final_calculado: string;
 }
 
 export interface Venda {
