@@ -56,6 +56,18 @@ interface ProdutoModalProps {
   onSuccess: () => void;
 }
 
+type SugestaoFiscal = { campos: Partial<Produto>; alerta: string };
+
+const CAMPOS_FISCAIS = new Set([
+  'ncm', 'cest', 'cfop', 'cst_icms', 'cst_pis', 'cst_cofins', 'origem_mercadoria', 'codigo_beneficio_fiscal',
+  'unidade_tributavel', 'gtin_tributavel', 'fator_conversao_tributavel', 'aliquota_icms', 'aliquota_pis',
+  'aliquota_cofins', 'fiscal_confianca', 'fiscal_fonte', 'fiscal_observacao',
+]);
+const TIPOS: Record<string, string> = {
+  NAO_CLASSIFICADO: 'Não classificado', FABRICACAO_PROPRIA: 'Fabricação própria', REVENDA: 'Revenda', INSUMO: 'Insumo', MISTO: 'Uso misto',
+};
+const formatarNcm = (ncm = '') => ncm.length === 8 ? `${ncm.slice(0, 4)}.${ncm.slice(4, 6)}.${ncm.slice(6)}` : ncm;
+
 const productErrorMessage = (error: unknown) => {
   if (!(error instanceof AxiosError) || !error.response?.data) {
     return 'Não foi possível salvar o produto.';
@@ -113,6 +125,10 @@ export default function ProdutoModal({ produto, onClose, onSuccess }: ProdutoMod
   const [showAddGrupo, setShowAddGrupo] = useState(false);
   const [novoGrupo, setNovoGrupo] = useState('');
   const [margem, setMargem] = useState<number | string>('');
+  // Produto já classificado (ou editado à mão) não é sobrescrito; só recebe a sugestão como opção.
+  const [fiscalManual, setFiscalManual] = useState(Boolean(produto?.ncm));
+  const [sugestao, setSugestao] = useState<SugestaoFiscal | null>(null);
+  const [sugestaoAplicada, setSugestaoAplicada] = useState(false);
 
   // Fetch Categorias/Grupos
   const { data: grupos = [] } = useQuery<Grupo[]>({
@@ -167,8 +183,40 @@ export default function ProdutoModal({ produto, onClose, onSuccess }: ProdutoMod
     }
   }, [produto]);
 
+  const aplicarSugestao = (campos: Partial<Produto>) => {
+    setFormData(prev => ({ ...prev, ...campos }));
+    setSugestaoAplicada(true);
+  };
+
+  useEffect(() => {
+    const nome = formData.nome.trim();
+    if (nome.length < 3) {
+      setSugestao(null);
+      return;
+    }
+    let ativo = true;
+    const timer = setTimeout(async () => {
+      try {
+        const { data } = await api.get<SugestaoFiscal>('/produtos/sugestao-fiscal/', {
+          params: {
+            nome, grupo: formData.grupo, codigo_barras: formData.codigo_barras,
+            unidade_medida: formData.unidade_medida,
+            tipo_origem_comercial: formData.tipo_origem_comercial === 'NAO_CLASSIFICADO' ? '' : formData.tipo_origem_comercial,
+          },
+        });
+        if (!ativo) return;
+        setSugestao(data);
+        if (!fiscalManual) aplicarSugestao(data.campos);
+      } catch {
+        if (ativo) setSugestao(null);
+      }
+    }, 400);
+    return () => { ativo = false; clearTimeout(timer); };
+  }, [formData.nome, formData.grupo, formData.codigo_barras, formData.unidade_medida, formData.tipo_origem_comercial, fiscalManual]);
+
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
+    if (CAMPOS_FISCAIS.has(name)) setFiscalManual(true);
 
     if (type === 'checkbox') {
       const checked = (e.target as HTMLInputElement).checked;
@@ -432,7 +480,20 @@ export default function ProdutoModal({ produto, onClose, onSuccess }: ProdutoMod
             <div style={{ gridColumn: 'span 12' }}>
               <details className="form-details">
                 <summary>Classificação fiscal NFC-e / NF-e</summary>
-                <p className="form-hint" style={{ marginTop: 8 }}>Preencha conforme a orientação do contador. O sistema inicia em homologação.</p>
+                <p className="form-hint" style={{ marginTop: 8 }}>Os campos são sugeridos pelo tipo e pela família do produto (Simples Nacional, RN). Confira com o contador. O sistema inicia em homologação.</p>
+                {sugestao && (
+                  <div className="fiscal-suggestion" role="status">
+                    <div>
+                      <strong>Sugestão para {TIPOS[String(sugestao.campos.tipo_origem_comercial)] ?? 'este produto'}</strong>
+                      <span>NCM {formatarNcm(sugestao.campos.ncm)}{sugestao.campos.cest ? ` · CEST ${sugestao.campos.cest}` : ''} · CFOP {sugestao.campos.cfop} · CSOSN {sugestao.campos.cst_icms} · PIS/COFINS {sugestao.campos.cst_pis}</span>
+                      <small>{sugestao.campos.fiscal_observacao}</small>
+                      {sugestao.alerta && <small className="text-danger">{sugestao.alerta}</small>}
+                    </div>
+                    {fiscalManual
+                      ? <button type="button" className="btn btn-ghost btn-sm" onClick={() => aplicarSugestao(sugestao.campos)}>Aplicar sugestão</button>
+                      : sugestaoAplicada && <span className="badge badge-green">Pré-preenchido</span>}
+                  </div>
+                )}
                 <div className="form-grid-12" style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 14, paddingTop: 12 }}>
                   <div style={{ gridColumn: 'span 4' }}><label className="form-label" htmlFor="produto-tipo-origem">Tipo do produto</label><select id="produto-tipo-origem" className="input" name="tipo_origem_comercial" value={formData.tipo_origem_comercial} onChange={handleChange}><option value="NAO_CLASSIFICADO">Não classificado</option><option value="FABRICACAO_PROPRIA">Fabricação própria</option><option value="REVENDA">Revenda</option><option value="INSUMO">Insumo</option><option value="MISTO">Uso misto</option></select></div>
                   <div style={{ gridColumn: 'span 4' }}><label className="form-label" htmlFor="produto-confianca-fiscal">Confiança da revisão</label><select id="produto-confianca-fiscal" className="input" name="fiscal_confianca" value={formData.fiscal_confianca} onChange={handleChange}><option value="NAO_REVISADO">Não revisado</option><option value="ALTA">Alta</option><option value="MEDIA">Média</option><option value="BAIXA">Baixa</option></select></div>

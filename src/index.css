@@ -2160,3 +2160,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
   .page-header-row > .badge { align-self: flex-start; }
 }
+
+/* Sugestão de classificação fiscal no cadastro de produto */
+.fiscal-suggestion { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 12px; padding: 12px 14px; border: 1px solid var(--border); border-left: 3px solid var(--accent-green); border-radius: 10px; background: var(--bg-body); }
+.fiscal-suggestion > div { display: grid; gap: 4px; min-width: 0; flex: 1 1 260px; }
+.fiscal-suggestion span { font-variant-numeric: tabular-nums; }
+.fiscal-suggestion small { color: var(--text-muted); }
