@@ -9,12 +9,14 @@ interface User {
   last_name?: string;
   papel?: 'ADMIN' | 'GERENTE' | 'CAIXA' | 'PRODUCAO' | 'ENTREGADOR';
   papel_label?: string;
+  /** Caixa: entra direto no PDV e não acessa o painel administrativo. */
+  somente_pdv?: boolean;
 }
 
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<User>;
   logout: () => void;
   setUser: (user: User | null) => void;
 }
@@ -36,6 +38,7 @@ export const useAuthStore = create<AuthState>()(
 
         const { data: user } = await api.get<User>('/auth/me/');
         set({ user, isAuthenticated: true });
+        return user;
       },
 
       logout: () => {

@@ -1,8 +1,9 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { useAuthStore } from './store/authStore';
 import PageLoader from './components/PageLoader';
+import api from './lib/api';
 import './index.css';
 
 const Login = lazy(() => import('./pages/Login/Login'));
@@ -31,9 +32,28 @@ interface PrivateRouteProps {
   children: React.ReactNode;
 }
 
-const PrivateRoute = ({ children }: PrivateRouteProps) => {
+/** Painel administrativo: o caixa é sempre levado de volta ao PDV. */
+const PainelRoute = ({ children }: PrivateRouteProps) => {
+  const { isAuthenticated, user } = useAuthStore();
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (user?.somente_pdv) return <Navigate to="/pdv" replace />;
+  return <>{children}</>;
+};
+
+const PdvRoute = ({ children }: PrivateRouteProps) => {
   const { isAuthenticated } = useAuthStore();
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
+  return isAuthenticated ? <>{children}</> : <Navigate to="/caixa" />;
+};
+
+/** Atualiza o papel salvo no navegador (ex.: login feito antes de o usuário virar caixa). */
+const AtualizarPerfil = () => {
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
+  const setUser = useAuthStore(state => state.setUser);
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    api.get('/auth/me/').then(({ data }) => setUser(data)).catch(() => undefined);
+  }, [isAuthenticated, setUser]);
+  return null;
 };
 
 const OrderTrackingRoute = () => {
@@ -45,15 +65,17 @@ function App() {
   return (
     <BrowserRouter>
       <Toaster position="top-right" richColors closeButton />
+      <AtualizarPerfil />
       <Suspense fallback={<PageLoader label="Abrindo módulo..." />}>
        <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/caixa" element={<Login modo="pdv" />} />
 
         {/* Cardápio online e acompanhamento de pedido: públicos, sem login */}
         <Route path="/cardapio" element={<OnlineMenu />} />
         <Route path="/acompanhar/:token" element={<OrderTrackingRoute />} />
 
-        <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
+        <Route path="/" element={<PainelRoute><Layout /></PainelRoute>}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="produtos" element={<Produtos />} />
@@ -73,7 +95,7 @@ function App() {
           <Route path="balancas" element={<Balancas />} />
         </Route>
 
-        <Route path="/pdv" element={<PrivateRoute><PDV /></PrivateRoute>} />
+        <Route path="/pdv" element={<PdvRoute><PDV /></PdvRoute>} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

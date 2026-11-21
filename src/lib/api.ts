@@ -50,9 +50,20 @@ api.interceptors.request.use((config) => {
 // tempo, todas esperam a mesma renovação em vez de disparar várias.
 let renovacaoEmAndamento: Promise<string> | null = null;
 
+/** O caixa volta para o login do PDV; os demais, para o login do painel. */
+export const paginaDeLogin = () => {
+  try {
+    const salvo = JSON.parse(localStorage.getItem('auth-storage') || '{}');
+    return salvo?.state?.user?.somente_pdv ? '/caixa' : '/login';
+  } catch {
+    return '/login';
+  }
+};
+
 const encerrarSessao = () => {
+  const destino = paginaDeLogin();
   localStorage.clear();
-  window.location.href = '/login';
+  window.location.href = destino;
 };
 
 export const renovarToken = () => {

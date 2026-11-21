@@ -26,6 +26,7 @@ import { cupomDaVenda, CupomDados } from '../../lib/cupom';
 import { imprimirVenda } from '../../lib/impressaoVenda';
 import { imprimirFechamento } from '../../lib/impressao';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuthStore } from '../../store/authStore';
 import { Produto, ItemCarrinho, Sessao, Venda, Pagamento } from './types';
 import CashOpsModal from './CashOpsModal';
 import Modal from '../../components/Modal';
@@ -121,6 +122,18 @@ export default function PDV() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  // O caixa não tem painel: sair do PDV encerra a sessão e volta ao login do caixa.
+  const somentePdv = useAuthStore(state => Boolean(state.user?.somente_pdv));
+  const logout = useAuthStore(state => state.logout);
+  const sairDoPdv = () => {
+    if (!somentePdv) {
+      navigate('/dashboard');
+      return;
+    }
+    logout();
+    queryClient.clear();
+    navigate('/caixa', { replace: true });
+  };
   const resumeVendaId = searchParams.get('venda_id');
   const isMobile = useMediaQuery('(max-width: 768px)');
   const [busca, setBusca] = useState('');
@@ -883,7 +896,7 @@ export default function PDV() {
                 Iniciar Vendas
                 <ArrowRight size={18} />
             </button>
-            <button className="btn btn-ghost" onClick={() => navigate('/dashboard')} style={{ width: '100%', marginTop: 12 }}>Voltar ao Painel</button>
+            <button className="btn btn-ghost" onClick={sairDoPdv} style={{ width: '100%', marginTop: 12 }}>{somentePdv ? 'Sair' : 'Voltar ao Painel'}</button>
          </div>
       </div>
     );
@@ -926,7 +939,7 @@ export default function PDV() {
             </button>
           </div>
 
-          <button aria-label="Sair do PDV" className="btn btn-ghost btn-sm pdv-header-icon-button" onClick={() => navigate('/dashboard')}>
+          <button aria-label={somentePdv ? 'Sair do PDV' : 'Voltar ao painel'} title={somentePdv ? 'Sair' : 'Voltar ao painel'} className="btn btn-ghost btn-sm pdv-header-icon-button" onClick={sairDoPdv}>
              <LogOut size={16} />
           </button>
         </div>

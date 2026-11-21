@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { LoaderCircle } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
-export default function Login() {
+/** `modo="pdv"`: login do caixa (/caixa), que sempre abre o PDV. */
+export default function Login({ modo = 'painel' }: { modo?: 'painel' | 'pdv' }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -17,8 +18,8 @@ export default function Login() {
     setError('');
     setIsSubmitting(true);
     try {
-      await login(username, password);
-      navigate('/dashboard');
+      const user = await login(username, password);
+      navigate(modo === 'pdv' || user.somente_pdv ? '/pdv' : '/dashboard', { replace: true });
     } catch {
       setError('Não foi possível entrar. Confira o usuário e a senha e tente novamente.');
     } finally { setIsSubmitting(false);
@@ -36,7 +37,7 @@ export default function Login() {
             Padaria <span style={{ color: 'var(--accent)' }}>Bella Fornada</span>
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: 4 }}>
-            Acesso ao sistema de gestão e PDV
+            {modo === 'pdv' ? 'Acesso ao caixa (PDV)' : 'Acesso ao sistema de gestão e PDV'}
           </p>
         </div>
 
