@@ -633,31 +633,20 @@ export default function PDV() {
       }
       if (!currentVenda) return;
 
-      await adicionarItemMutation.mutateAsync({
+      const item = await adicionarItemMutation.mutateAsync({
         vendaId: currentVenda.id,
         produto,
         qty: quantidade
       });
 
       setCarrinho(prev => {
-        const idx = prev.findIndex(i => i.produto_id === produto.id);
-        const preco = Number(produto.preco_venda);
-        if (idx >= 0) {
-          const novo = [...prev];
-          const novaQty = novo[idx].quantidade + quantidade;
-          novo[idx] = {
-            ...novo[idx],
-            quantidade: novaQty,
-            subtotal: novaQty * novo[idx].preco_unitario
-          };
-          return novo;
-        }
         return [...prev, {
+          id: item.id,
           produto_id: produto.id,
           nome: produto.nome,
-          quantidade,
-          preco_unitario: preco,
-          subtotal: preco * quantidade,
+          quantidade: Number(item.quantidade),
+          preco_unitario: Number(item.preco_unitario),
+          subtotal: Number(item.subtotal),
           unidade: produto.unidade_medida
         }];
       });
