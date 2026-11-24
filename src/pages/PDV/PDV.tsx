@@ -140,14 +140,9 @@ export default function PDV() {
   const [resultados, setResultados] = useState<Produto[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [qtyMultiplier, setQtyMultiplier] = useState(1);
-  const [carrinho, setCarrinho] = useState<ItemCarrinho[]>(() => {
-    const saved = localStorage.getItem('pdv_cart');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [venda, setVenda] = useState<Venda | null>(() => {
-    const saved = localStorage.getItem('pdv_venda');
-    return saved ? JSON.parse(saved) : null;
-  });
+  // A venda é recuperada do servidor para a conta e sessão autenticadas.
+  const [carrinho, setCarrinho] = useState<ItemCarrinho[]>([]);
+  const [venda, setVenda] = useState<Venda | null>(null);
   const [productAddingId, setProductAddingId] = useState<number | string | null>(null);
 
   // Mantém o monitor ligado enquanto o terminal do PDV estiver visível.
@@ -215,12 +210,6 @@ export default function PDV() {
   const [editingPrice, setEditingPrice] = useState('');
   const [isSavingPrice, setIsSavingPrice] = useState(false);
 
-  // Persistência local do estado da venda
-  useEffect(() => {
-    localStorage.setItem('pdv_cart', JSON.stringify(carrinho));
-    if (venda) localStorage.setItem('pdv_venda', JSON.stringify(venda));
-    else localStorage.removeItem('pdv_venda');
-  }, [carrinho, venda]);
   const [showPagamento, setShowPagamento] = useState(false);
   const [fundoInicial, setFundoInicial] = useState('');
   const [activeTab, setActiveTab] = useState<'search' | 'cart'>('search');

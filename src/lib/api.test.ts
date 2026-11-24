@@ -1,6 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import api from './api';
+import api, { renovarToken } from './api';
 
 const dados = new Map<string, string>();
 
@@ -35,6 +35,17 @@ afterEach(() => {
 });
 
 describe('renovação do login', () => {
+  it('não restaura tokens antigos quando há troca de usuário durante o refresh', async () => {
+    let concluir!: (value: { data: { access: string; refresh: string } }) => void;
+    vi.spyOn(axios, 'post').mockImplementation(() => new Promise(resolve => { concluir = resolve; }));
+    const renovacao = renovarToken();
+    dados.set('access_token', 'outra-conta');
+    dados.set('refresh_token', 'refresh-outra-conta');
+    concluir({ data: { access: 'novo', refresh: 'refresh-novo' } });
+    await expect(renovacao).rejects.toThrow('Sessão alterada');
+    expect(dados.get('access_token')).toBe('outra-conta');
+    expect(dados.get('refresh_token')).toBe('refresh-outra-conta');
+  });
   it('renova o access, salva o refresh novo e repete a requisição', async () => {
     const post = vi.spyOn(axios, 'post').mockResolvedValue({ data: { access: 'novo', refresh: 'refresh-novo' } });
 

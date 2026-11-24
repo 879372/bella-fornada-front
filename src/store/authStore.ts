@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import api from '../lib/api';
+import { limparDadosDaConta } from '../lib/queryClient';
 
 interface User {
   id: number;
@@ -37,11 +38,13 @@ export const useAuthStore = create<AuthState>()(
         localStorage.setItem('refresh_token', data.refresh);
 
         const { data: user } = await api.get<User>('/auth/me/');
+        limparDadosDaConta();
         set({ user, isAuthenticated: true });
         return user;
       },
 
       logout: () => {
+        limparDadosDaConta();
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         set({ user: null, isAuthenticated: false });

@@ -71,7 +71,15 @@ export const renovarToken = () => {
     const refreshToken = localStorage.getItem('refresh_token');
     renovacaoEmAndamento = (async () => {
       if (!refreshToken) throw new Error('Sem refresh token');
-      const { data } = await axios.post(`${API_BASE_URL}/auth/refresh/`, { refresh: refreshToken });
+      let data;
+      try {
+        ({ data } = await axios.post(`${API_BASE_URL}/auth/refresh/`, { refresh: refreshToken }));
+      } catch (error) {
+        if (localStorage.getItem('refresh_token') !== refreshToken) throw new Error('Sessão alterada');
+        throw error;
+      }
+      // Uma renovação iniciada antes do logout não pode restaurar a conta antiga.
+      if (localStorage.getItem('refresh_token') !== refreshToken) throw new Error('Sessão alterada');
       localStorage.setItem('access_token', data.access);
       // Com ROTATE_REFRESH_TOKENS o backend devolve um refresh novo (validade
       // renovada). Sem salvar, a sessão vencia no prazo do refresh original.
@@ -93,6 +101,9 @@ api.interceptors.response.use(
 
     // 1. Silent Refresh for 401s
     if (error.response?.status === 401 && originalRequest && !originalRequest._retry && !isAuthCall) {
+      if (originalRequest.headers.Authorization !== `Bearer ${localStorage.getItem('access_token')}`) {
+        return Promise.reject(error);
+      }
       originalRequest._retry = true;
 
       if (!localStorage.getItem('refresh_token')) {
@@ -105,6 +116,7 @@ api.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${access}`;
         return api(originalRequest);
       } catch (refreshError: any) {
+        if (refreshError?.message === 'Sessão alterada') return Promise.reject(error);
         // Só desloga quando o servidor recusa o refresh (expirado/inválido).
         // Falha de rede ou servidor fora do ar mantém o login.
         const status = refreshError?.response?.status;

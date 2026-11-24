@@ -12,6 +12,8 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.resetAllMocks(); });
 
 it('mantém leituras repetidas em linhas distintas antes e depois de recarregar a venda', async () => {
   const storage = new Map<string, string>();
+  storage.set('pdv_venda', JSON.stringify({ id: 'venda-outro-usuario' }));
+  storage.set('pdv_cart', JSON.stringify([{ nome: 'Produto de outro usuário' }]));
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => storage.get(key) ?? null,
     setItem: (key: string, value: string) => { storage.set(key, value); },
@@ -41,6 +43,7 @@ it('mantém leituras repetidas em linhas distintas antes e depois de recarregar 
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(<QueryClientProvider client={client}><MemoryRouter><PDV /></MemoryRouter></QueryClientProvider>);
   await screen.findByText('Pão teste');
+  expect(screen.queryByText('Produto de outro usuário')).not.toBeInTheDocument();
   const busca = screen.getByPlaceholderText('Buscar produto... (F3)');
   fireEvent.change(busca, { target: { value: '789123' } });
   fireEvent.keyDown(busca, { key: 'Enter' });

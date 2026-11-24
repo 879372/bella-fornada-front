@@ -48,11 +48,16 @@ const PdvRoute = ({ children }: PrivateRouteProps) => {
 /** Atualiza o papel salvo no navegador (ex.: login feito antes de o usuário virar caixa). */
 const AtualizarPerfil = () => {
   const isAuthenticated = useAuthStore(state => state.isAuthenticated);
+  const userId = useAuthStore(state => state.user?.id);
   const setUser = useAuthStore(state => state.setUser);
   useEffect(() => {
     if (!isAuthenticated) return;
-    api.get('/auth/me/').then(({ data }) => setUser(data)).catch(() => undefined);
-  }, [isAuthenticated, setUser]);
+    let ativo = true;
+    api.get('/auth/me/').then(({ data }) => {
+      if (ativo) setUser(data);
+    }).catch(() => undefined);
+    return () => { ativo = false; };
+  }, [isAuthenticated, userId, setUser]);
   return null;
 };
 
