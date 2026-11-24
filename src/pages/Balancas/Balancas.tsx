@@ -1,8 +1,42 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { Download, Save, Scale } from 'lucide-react';
+import { Download, FolderOpen, Save, Scale } from 'lucide-react';
 import { toast } from 'sonner';
 
 import api from '../../lib/api';
+import {
+  PASTA_BALANCA_SUGERIDA,
+  baixarArquivo,
+  gravarNaPasta,
+  nomePastaSalva,
+  obterPastaBalanca,
+  suportaGravarNaPasta,
+} from '../../lib/pastaBalanca';
+
+const ARQUIVOS = { itensmgv: 'ITENSMGV.TXT', depto: 'DEPTO.TXT' } as const;
+
+async function gerarArquivos(): Promise<Record<string, Blob>> {
+  const arquivos = await Promise.all(Object.entries(ARQUIVOS).map(async ([parametro, nome]) => {
+    const { data } = await api.get<Blob>('/balancas/exportar/', {
+      params: { arquivo: parametro },
+      responseType: 'blob',
+    });
+    return [nome, data] as const;
+  }));
+  return Object.fromEntries(arquivos);
+}
+
+async function mensagemDeErro(erro: unknown): Promise<string> {
+  const data = (erro as { response?: { data?: unknown } })?.response?.data;
+  if (data instanceof Blob) {
+    try {
+      const json = JSON.parse(await data.text());
+      if (json?.detail) return json.detail;
+    } catch {
+      // resposta não era JSON
+    }
+  }
+  return 'Não foi possível gerar a carga da balança.';
+}
 
 interface ConfiguracaoBalanca {
   nome: string;
@@ -33,6 +67,12 @@ export default function Balancas() {
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [exportando, setExportando] = useState(false);
+  const [pastaSalva, setPastaSalva] = useState<string | null>(null);
+  const gravaNaPasta = suportaGravarNaPasta();
+
+  useEffect(() => {
+    if (gravaNaPasta) nomePastaSalva().then(setPastaSalva);
+  }, [gravaNaPasta]);
 
   useEffect(() => {
     api.get<ConfiguracaoBalanca>('/balancas/configuracao/')
@@ -67,19 +107,29 @@ export default function Balancas() {
     }
   };
 
-  const exportar = async () => {
+  const exportar = async (trocarPasta = false) => {
     setExportando(true);
     try {
-      const { data } = await api.get('/balancas/exportar/', { responseType: 'blob' });
-      const url = URL.createObjectURL(data);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'carga_balanca.csv';
-      link.click();
-      URL.revokeObjectURL(url);
-      toast.success('Carga gerada com os produtos ativos vendidos por KG.');
-    } catch {
-      toast.error('Não foi possível gerar a carga da balança.');
+      if (gravaNaPasta) {
+        let pasta;
+        try {
+          pasta = await obterPastaBalanca(trocarPasta);
+        } catch (erro) {
+          if ((erro as DOMException)?.name === 'AbortError') return;
+          throw erro;
+        }
+        // A escolha/permissão deve acontecer antes da rede, durante o clique.
+        const arquivos = await gerarArquivos();
+        await gravarNaPasta(pasta, arquivos);
+        setPastaSalva(pasta.name);
+        toast.success(`ITENSMGV.TXT e DEPTO.TXT gravados na pasta ${pasta.name}. Agora importe no MGV.`);
+      } else {
+        const arquivos = await gerarArquivos();
+        Object.entries(arquivos).forEach(([nome, conteudo]) => baixarArquivo(nome, conteudo));
+        toast.success(`Arquivos baixados. Mova ITENSMGV.TXT e DEPTO.TXT para ${PASTA_BALANCA_SUGERIDA}.`);
+      }
+    } catch (erro) {
+      toast.error(await mensagemDeErro(erro));
     } finally {
       setExportando(false);
     }
@@ -94,7 +144,7 @@ export default function Balancas() {
           <h1 style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Scale size={26} /> Balanças
           </h1>
-          <p>Configure a Prix e gere a carga de produtos pesáveis para o MGV.</p>
+          <p>Configure a Prix e gere a carga (ITENSMGV.TXT e DEPTO.TXT) para o MGV.</p>
         </div>
       </div>
 
@@ -120,10 +170,23 @@ export default function Balancas() {
           <button className="btn btn-primary" type="submit" disabled={salvando}>
             <Save size={16} /> {salvando ? 'Salvando...' : 'Salvar configuração'}
           </button>
-          <button className="btn btn-secondary" type="button" onClick={exportar} disabled={exportando}>
-            <Download size={16} /> {exportando ? 'Gerando...' : 'Gerar carga CSV'}
+          <button className="btn btn-secondary" type="button" onClick={() => exportar()} disabled={exportando}>
+            <Download size={16} /> {exportando ? 'Gerando...' : 'Gerar carga MGV'}
           </button>
+          {gravaNaPasta && pastaSalva && (
+            <button className="btn btn-secondary" type="button" onClick={() => exportar(true)} disabled={exportando}>
+              <FolderOpen size={16} /> Trocar pasta
+            </button>
+          )}
         </div>
+        <p className="form-hint" style={{ marginTop: 12 }}>
+          Vão para a carga os produtos ativos marcados com "Enviar para a balança" no cadastro.{' '}
+          {gravaNaPasta
+            ? pastaSalva
+              ? `Os arquivos serão gravados na pasta ${pastaSalva}.`
+              : `Na primeira vez, escolha a pasta ${PASTA_BALANCA_SUGERIDA}. Ela fica lembrada neste computador.`
+            : `Este navegador só baixa os arquivos: mova-os para ${PASTA_BALANCA_SUGERIDA} ou use o Chrome/Edge para gravar direto.`}
+        </p>
       </form>
     </div>
   );

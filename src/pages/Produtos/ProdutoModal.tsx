@@ -27,6 +27,9 @@ interface Produto {
   disponivel_delivery: boolean;
   imagem_url: string;
   tempo_preparo_minutos: number | string;
+  enviar_balanca?: boolean;
+  tipo_balanca?: string;
+  validade_balanca_dias?: number | string | null;
   ncm: string;
   cest: string;
   cfop: string;
@@ -100,6 +103,9 @@ export default function ProdutoModal({ produto, onClose, onSuccess }: ProdutoMod
     disponivel_delivery: false,
     imagem_url: '',
     tempo_preparo_minutos: 15,
+    enviar_balanca: false,
+    tipo_balanca: '',
+    validade_balanca_dias: '',
     ncm: '',
     cest: '',
     cfop: '5102',
@@ -167,6 +173,9 @@ export default function ProdutoModal({ produto, onClose, onSuccess }: ProdutoMod
         preco_compra: produto.preco_compra ?? '',
         preco_venda: produto.preco_venda ?? '',
         marca: produto.marca || '',
+        enviar_balanca: Boolean(produto.enviar_balanca),
+        tipo_balanca: produto.tipo_balanca || '',
+        validade_balanca_dias: produto.validade_balanca_dias ?? '',
         cst_pis: produto.cst_pis || '',
         cst_cofins: produto.cst_cofins || '',
         codigo_beneficio_fiscal: produto.codigo_beneficio_fiscal || '',
@@ -259,6 +268,9 @@ export default function ProdutoModal({ produto, onClose, onSuccess }: ProdutoMod
         preco_compra: formData.preco_compra === '' ? 0 : Number(formData.preco_compra),
         preco_venda: formData.preco_venda === '' ? 0 : Number(formData.preco_venda),
         tempo_preparo_minutos: Number(formData.tempo_preparo_minutos || 15),
+        validade_balanca_dias: formData.validade_balanca_dias === '' || formData.validade_balanca_dias == null
+          ? null
+          : Number(formData.validade_balanca_dias),
         aliquota_icms: Number(formData.aliquota_icms || 0),
         aliquota_pis: Number(formData.aliquota_pis || 0),
         aliquota_cofins: Number(formData.aliquota_cofins || 0),
@@ -473,6 +485,31 @@ export default function ProdutoModal({ produto, onClose, onSuccess }: ProdutoMod
                   <div style={{ gridColumn: 'span 8' }}><label className="form-label" htmlFor="produto-imagem">URL da imagem</label><input id="produto-imagem" name="imagem_url" type="url" value={formData.imagem_url} onChange={handleChange} className="input" placeholder="https://..." /></div>
                   <div style={{ gridColumn: 'span 4' }}><label className="form-label" htmlFor="produto-preparo">Preparo (min)</label><input id="produto-preparo" name="tempo_preparo_minutos" type="number" min="1" value={formData.tempo_preparo_minutos} onChange={handleChange} className="input" /></div>
                   <div style={{ gridColumn: 'span 12' }}><label className="form-label" htmlFor="produto-descricao-delivery">Descrição para o cliente</label><textarea id="produto-descricao-delivery" name="descricao_delivery" rows={3} value={formData.descricao_delivery} onChange={handleChange} className="input" placeholder="Descreva o produto, tamanho e principais ingredientes" /></div>
+                </div>
+              </details>
+            </div>
+
+            <div style={{ gridColumn: 'span 12' }}>
+              <details className="form-details" open={Boolean(formData.enviar_balanca)}>
+                <summary>Balança (carga MGV)</summary>
+                <div className="form-grid-12" style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 14, paddingTop: 14 }}>
+                  <label style={{ gridColumn: 'span 12', display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <input type="checkbox" name="enviar_balanca" checked={Boolean(formData.enviar_balanca)} onChange={handleChange} style={{ width: 18, height: 18 }} />
+                    <span>Enviar para a balança (usa o código do produto como PLU)</span>
+                  </label>
+                  <div style={{ gridColumn: 'span 6' }}>
+                    <label className="form-label" htmlFor="produto-tipo-balanca">Tipo na balança</label>
+                    <select id="produto-tipo-balanca" name="tipo_balanca" value={formData.tipo_balanca ?? ''} onChange={handleChange} className="input">
+                      <option value="">Automático (KG = peso, demais = unidade)</option>
+                      <option value="0">Venda por peso</option>
+                      <option value="1">Venda por unidade</option>
+                      <option value="2">Tipo 2 (legado)</option>
+                    </select>
+                  </div>
+                  <div style={{ gridColumn: 'span 6' }}>
+                    <label className="form-label" htmlFor="produto-validade-balanca">Validade (dias)</label>
+                    <input id="produto-validade-balanca" name="validade_balanca_dias" type="number" min="0" max="999" value={formData.validade_balanca_dias ?? ''} onChange={handleChange} className="input" placeholder="Padrão da balança" />
+                  </div>
                 </div>
               </details>
             </div>
